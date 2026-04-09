@@ -38,6 +38,12 @@ function buildAnthropicCompatibleUrl(baseUrl, path) {
   return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
+function buildCompatibleUrl(baseUrl, path, defaultPath) {
+  const normalizedBaseUrl = (baseUrl || '').replace(/\/+$/, '');
+  const normalizedPath = `/${(path || defaultPath).replace(/^\/+/, '')}`;
+  return `${normalizedBaseUrl}${normalizedPath}`;
+}
+
 export default async function handler(request, response) {
   const body = request.body || {};
   const { searchParams } = new URL(request.url, `http://${request.headers.host}`);
@@ -98,6 +104,30 @@ export default async function handler(request, response) {
       response,
       isStreaming,
       'OpenAI',
+    );
+  }
+
+  // 火山引擎方舟路由，使用固定 base URL，只需配置 API Key
+  if (provider === 'volcengine' || provider === 'ark') {
+    if (!process.env.VOLCENGINE_API_KEY) {
+      return response.status(500).json({ error: "Missing 'VOLCENGINE_API_KEY' environment variable" });
+    }
+
+    const volcengineApiUrl = buildCompatibleUrl(
+      'https://ark.cn-beijing.volces.com/api/v3',
+      path,
+      'chat/completions',
+    );
+    return proxyJsonRequest(
+      volcengineApiUrl,
+      {
+        'Authorization': `Bearer ${process.env.VOLCENGINE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body,
+      response,
+      isStreaming,
+      'Volcengine',
     );
   }
 

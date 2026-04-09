@@ -107,6 +107,30 @@ export default async function handler(request, response) {
     );
   }
 
+  // DeepSeek 火山路由，按 DeepSeek 独立配置，底层仍走火山方舟
+  if (provider === 'deepseek' || provider === 'deepseek_volcengine') {
+    if (!process.env.DEEPSEEK_VOLCENGINE_API_KEY) {
+      return response.status(500).json({ error: "Missing 'DEEPSEEK_VOLCENGINE_API_KEY' environment variable" });
+    }
+
+    const deepseekApiUrl = buildCompatibleUrl(
+      'https://ark.cn-beijing.volces.com/api/v3',
+      path,
+      'chat/completions',
+    );
+    return proxyJsonRequest(
+      deepseekApiUrl,
+      {
+        'Authorization': `Bearer ${process.env.DEEPSEEK_VOLCENGINE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body,
+      response,
+      isStreaming,
+      'DeepSeek Volcengine',
+    );
+  }
+
   // 火山引擎方舟路由，使用固定 base URL，只需配置 API Key
   if (provider === 'volcengine' || provider === 'ark') {
     if (!process.env.VOLCENGINE_API_KEY) {

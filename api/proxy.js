@@ -63,6 +63,7 @@ export default async function handler(request, response) {
   }
 
   // Anthropic 兼容路由，保留旧 Claude 官方直连方式
+  // 这是当前默认的 Claude 请求方式
   if (provider === 'anthropic' || provider === 'claude-compatible') {
     if (!process.env.ANTHROPIC_BASE_URL) {
       return response.status(500).json({ error: "Missing 'ANTHROPIC_BASE_URL' environment variable" });
@@ -74,7 +75,7 @@ export default async function handler(request, response) {
       {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
-        'anthropic-version': process.env.ANTHROPIC_VERSION || '2023-06-01',
+        'anthropic-version': '2023-06-01',
       },
       body,
       response,

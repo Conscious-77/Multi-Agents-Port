@@ -90,6 +90,34 @@ export default async function handler(request, response) {
     );
   }
 
+  // GPT Micu 兼容路由，面向 OpenAI chat completions 接口
+  if (provider === 'gpt-micu') {
+    if (!process.env.GPT_MICU_BASE_URL) {
+      return response.status(500).json({ error: "Missing 'GPT_MICU_BASE_URL' environment variable" });
+    }
+    if (!process.env.GPT_MICU_API_KEY) {
+      return response.status(500).json({ error: "Missing 'GPT_MICU_API_KEY' environment variable" });
+    }
+
+    const gptMicuApiUrl = buildCompatibleUrl(
+      process.env.GPT_MICU_BASE_URL,
+      path,
+      'v1/chat/completions',
+    );
+    return proxyJsonRequest(
+      gptMicuApiUrl,
+      {
+        'Authorization': `Bearer ${process.env.GPT_MICU_API_KEY}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'codex_cli_rs/0.77.0 (Windows 10.0.26100; x86_64) WindowsTerminal',
+      },
+      body,
+      response,
+      isStreaming,
+      'GPT Micu',
+    );
+  }
+
   // OpenAI 路由...
   if (provider === 'openai') {
     if (!path) return response.status(400).json({ error: "Missing 'path' parameter" });

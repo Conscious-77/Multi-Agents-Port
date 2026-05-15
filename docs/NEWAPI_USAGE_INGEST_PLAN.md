@@ -180,6 +180,31 @@ New API backend:  http://127.0.0.1:11002
 - `.cc` 请求链路仍然直接打真实上游，New API 只做旁路统计。
 - New API ingest 失败不应该影响模型响应。
 
+## 当前 `.cc` 入口状态
+
+当前 Git 版本已经把统计包装层接管为正式 proxy 入口：
+
+```txt
+api/proxy.js          正式入口，走 usage 统计包装层
+api/proxy-stats.js    显式测试入口，保留同一套统计逻辑
+api/proxy-legacy.js   旧 proxy 备份，方便必要时回滚
+```
+
+因此原有客户端请求格式保持不变：
+
+```txt
+/api/proxy?provider=gemini&path=...
+```
+
+线上如需临时查看 `/tmp` 汇总，可继续使用：
+
+```txt
+/api/proxy?stats=1
+/api/proxy-stats?stats=1
+```
+
+注意：`/tmp` 统计只用于调试，不是正式持久化。
+
 ## 推荐方案
 
 ### 推荐方案 A：给 New API 增加 usage ingest API

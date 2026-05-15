@@ -123,6 +123,15 @@ function withOpenAICompatibleStreamUsage(body, includeUsage = true) {
   };
 }
 
+function shouldTreatAsStreaming(apiResponse, upstream, body) {
+  if (body.stream === true) return true;
+
+  const contentType = apiResponse.headers?.get?.('content-type') || '';
+  if (contentType.toLowerCase().includes('text/event-stream')) return true;
+
+  return /streamGenerateContent/i.test(upstream.requestPath || '');
+}
+
 export function buildUpstreamRequest({ provider, requestPath, body }) {
   if (provider === 'claude') {
     return {
@@ -292,7 +301,7 @@ async function proxyRequestWithStats(request, response) {
   const { searchParams } = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   const provider = (searchParams.get('provider') || 'gemini').toLowerCase();
   const requestPath = searchParams.get('path');
-  const isStreaming = body.stream === true;
+  let isStreaming = body.stream === true;
 
   let upstream;
   try {
@@ -307,6 +316,8 @@ async function proxyRequestWithStats(request, response) {
       headers: upstream.headers,
       body: JSON.stringify(upstream.body),
     });
+
+    isStreaming = shouldTreatAsStreaming(apiResponse, upstream, body);
 
     if (isStreaming) {
       return streamResponseWithStats(apiResponse, response, async (streamText) => {

@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/claude-code-micu/:path*",
+      "destination": "/api/claude-code-micu?path=:path*"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+.DS_Store
+.env*.local
+.vercel
+.usage-stats.json
+*.jsonl

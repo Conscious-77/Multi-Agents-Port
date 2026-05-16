@@ -52,17 +52,20 @@ function buildForwardHeaders(request) {
   setHeader(headers, 'Content-Type', getHeader(request, 'content-type') || 'application/json');
   setHeader(headers, 'Accept', getHeader(request, 'accept'));
   setHeader(headers, 'User-Agent', getHeader(request, 'user-agent') || 'Claude-Code');
-  setHeader(headers, 'anthropic-version', getHeader(request, 'anthropic-version'));
+  setHeader(headers, 'anthropic-version', getHeader(request, 'anthropic-version') || '2023-06-01');
   setHeader(headers, 'anthropic-beta', getHeader(request, 'anthropic-beta'));
   setHeader(headers, 'anthropic_version', getHeader(request, 'anthropic_version'));
   setHeader(headers, 'anthropic_beta', getHeader(request, 'anthropic_beta'));
 
+  const upstreamApiKey = process.env.CLAUDE_MICU_PROXY_API_KEY || process.env.CLAUDE_MICU_API_KEY;
+  const clientApiKey = getHeader(request, 'x-api-key');
   const authorization = getHeader(request, 'authorization');
-  const apiKey = getHeader(request, 'x-api-key') || process.env.CLAUDE_MICU_API_KEY;
-  if (authorization) {
-    setHeader(headers, 'Authorization', authorization);
-  } else if (apiKey) {
+  const apiKey = upstreamApiKey || clientApiKey;
+
+  if (apiKey) {
     setHeader(headers, 'Authorization', `Bearer ${apiKey}`);
+  } else if (authorization) {
+    setHeader(headers, 'Authorization', authorization);
   }
   if (apiKey) {
     setHeader(headers, 'x-api-key', apiKey);

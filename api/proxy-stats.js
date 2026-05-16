@@ -183,10 +183,10 @@ export function buildUpstreamRequest({ provider, requestPath, body }) {
     return {
       provider: 'gpt-micu',
       modelFallback: body.model,
-      apiUrl: buildCompatibleUrl('https://www.micuapi.ai', requestPath, 'v1/chat/completions'),
+      apiUrl: buildCompatibleUrl('https://www.micuapi.ai', requestPath, 'v1/responses'),
       headers,
       body: withOpenAICompatibleStreamUsage(body),
-      requestPath: requestPath || 'v1/chat/completions',
+      requestPath: requestPath || 'v1/responses',
       errorLabel: 'GPT Micu',
     };
   }

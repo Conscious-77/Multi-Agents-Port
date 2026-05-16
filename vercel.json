@@ -2,6 +2,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api/gpt-micu/v1/responses",
+      "destination": "/api/gpt-micu/v1/responses"
+    },
+    {
       "source": "/api/claude-code-micu/:path*",
       "destination": "/api/claude-code-micu?path=:path*"
     }

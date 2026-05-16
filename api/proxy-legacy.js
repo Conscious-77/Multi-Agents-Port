@@ -97,7 +97,7 @@ export default async function handler(request, response) {
     }
 
     const gptMicuApiUrl = buildCompatibleUrl(
-      'https://www.openclaudecode.cn',
+      'https://www.micuapi.cn',
       path,
       'v1/chat/completions',
     );

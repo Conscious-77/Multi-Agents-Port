@@ -1,6 +1,8 @@
 import { normalizeUsageByProvider } from '../lib/usage-normalizers.js';
 import { createUsageRecord, getUsageSnapshot, writeUsageRecord } from '../lib/stats-writer.js';
 
+// Production Vercel entry for /api/proxy.
+// Keep usage capture here so the public model endpoint always records stats.
 async function streamResponseWithStats(apiResponse, clientResponse, onComplete) {
   if (typeof clientResponse.status === 'function') {
     clientResponse.status(apiResponse.status);
@@ -96,7 +98,8 @@ function hasUsageMetadata(provider, chunk) {
     return Boolean(chunk.usageMetadata || chunk.usage_metadata);
   }
 
-  return Boolean(chunk.usage);
+  // OpenAI Responses streams report final usage under response.usage.
+  return Boolean(chunk.usage || chunk.response?.usage);
 }
 
 export function selectUsagePayload(provider, chunks, fallbackPayload = {}) {

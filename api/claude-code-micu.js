@@ -3,6 +3,7 @@ import { createUsageRecord, getUsageSnapshot, writeUsageRecord } from '../lib/st
 
 const TARGET_BASE_URL = 'https://www.micuapi.ai';
 
+// Dedicated Claude Code compatible Micu endpoint, with the same usage writer.
 function safeJsonParse(text) {
   try {
     return JSON.parse(text);

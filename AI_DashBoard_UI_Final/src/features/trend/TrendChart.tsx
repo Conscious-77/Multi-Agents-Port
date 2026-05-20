@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { UsageLog } from '@/lib/logs'
+import type { QuotaDataItem } from '@/lib/quota-data'
 import { formatNumber } from '@/lib/format'
 import type { Period } from '@/lib/period'
 import {
   bucketLogs,
   bucketLogsByModel,
+  bucketQuotaData,
+  bucketQuotaDataByModel,
   pickMetric,
   type MetricBucket,
   type ModelSeries,
@@ -16,6 +19,7 @@ type ChartType = 'line' | 'bar'
 
 interface TrendChartProps {
   logs: UsageLog[]
+  quotaRows: QuotaDataItem[]
   period: Period
   loading?: boolean
   palette: string[]
@@ -49,15 +53,20 @@ export function TrendChart(props: TrendChartProps) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
   const aggregate = useMemo(
-    () => bucketLogs(props.logs, props.period),
-    [props.logs, props.period]
+    () =>
+      metric === 'total'
+        ? bucketQuotaData(props.quotaRows, props.period)
+        : bucketLogs(props.logs, props.period),
+    [metric, props.logs, props.quotaRows, props.period]
   )
   const grouped = useMemo(
     () =>
       byModel
-        ? bucketLogsByModel(props.logs, props.period, props.palette)
+        ? metric === 'total'
+          ? bucketQuotaDataByModel(props.quotaRows, props.period, props.palette)
+          : bucketLogsByModel(props.logs, props.period, props.palette)
         : null,
-    [byModel, props.logs, props.period, props.palette]
+    [byModel, metric, props.logs, props.quotaRows, props.period, props.palette]
   )
 
   const series: ModelSeries[] = useMemo(() => {

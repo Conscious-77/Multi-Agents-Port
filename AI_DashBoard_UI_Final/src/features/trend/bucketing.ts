@@ -1,4 +1,5 @@
 import { parseOther, type UsageLog } from '@/lib/logs'
+import type { QuotaDataItem } from '@/lib/quota-data'
 import type { Period, PeriodKey } from '@/lib/period'
 
 const HOUR = 3600
@@ -100,6 +101,12 @@ function addLog(target: MetricBucket, log: UsageLog): void {
   target.cached += cached
 }
 
+function addQuota(target: MetricBucket, row: QuotaDataItem): void {
+  target.total += Number(row.token_used) || 0
+  target.cost += Number(row.quota) || 0
+  target.requests += Number(row.count) || 0
+}
+
 // Aggregate-mode bucketing: one series for the whole dataset.
 export function bucketLogs(
   logs: UsageLog[],
@@ -111,6 +118,20 @@ export function bucketLogs(
     const idx = bucketIndex(log.created_at, period.start, spec.sizeSec, spec.count)
     if (idx < 0) continue
     addLog(buckets[idx], log)
+  }
+  return { spec, buckets }
+}
+
+export function bucketQuotaData(
+  rows: QuotaDataItem[],
+  period: Period
+): { spec: BucketSpec; buckets: MetricBucket[] } {
+  const spec = pickBuckets(period)
+  const buckets = Array.from({ length: spec.count }, emptyBucket)
+  for (const row of rows) {
+    const idx = bucketIndex(row.created_at, period.start, spec.sizeSec, spec.count)
+    if (idx < 0) continue
+    addQuota(buckets[idx], row)
   }
   return { spec, buckets }
 }
@@ -180,6 +201,60 @@ export function bucketLogsByModel(
       : othersEntry
     if (!target) continue
     addLog(target.buckets[idx], log)
+  }
+
+  return { spec, series }
+}
+
+export function bucketQuotaDataByModel(
+  rows: QuotaDataItem[],
+  period: Period,
+  palette: string[],
+  topN = 4
+): { spec: BucketSpec; series: ModelSeries[] } {
+  const spec = pickBuckets(period)
+
+  const tally = new Map<string, number>()
+  for (const row of rows) {
+    const model = row.model_name || 'unknown'
+    tally.set(model, (tally.get(model) ?? 0) + (Number(row.token_used) || 0))
+  }
+  const ranked = Array.from(tally.entries()).sort((a, b) => b[1] - a[1])
+  const topModels = new Set(ranked.slice(0, topN).map((e) => e[0]))
+  const hasOthers = ranked.length > topN
+
+  const series: ModelSeries[] = []
+  const seriesByKey = new Map<string, ModelSeries>()
+  ranked.slice(0, topN).forEach(([model, total], i) => {
+    const entry: ModelSeries = {
+      model,
+      color: palette[i % palette.length],
+      buckets: Array.from({ length: spec.count }, emptyBucket),
+      totalTokens: total,
+    }
+    series.push(entry)
+    seriesByKey.set(model, entry)
+  })
+  let othersEntry: ModelSeries | null = null
+  if (hasOthers) {
+    othersEntry = {
+      model: `Others (${ranked.length - topN})`,
+      color: '#c1b8ee',
+      buckets: Array.from({ length: spec.count }, emptyBucket),
+      totalTokens: ranked.slice(topN).reduce((s, [, v]) => s + v, 0),
+    }
+    series.push(othersEntry)
+  }
+
+  for (const row of rows) {
+    const idx = bucketIndex(row.created_at, period.start, spec.sizeSec, spec.count)
+    if (idx < 0) continue
+    const model = row.model_name || 'unknown'
+    const target = topModels.has(model)
+      ? seriesByKey.get(model)!
+      : othersEntry
+    if (!target) continue
+    addQuota(target.buckets[idx], row)
   }
 
   return { spec, series }

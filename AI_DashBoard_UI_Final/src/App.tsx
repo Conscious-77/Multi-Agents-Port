@@ -7,7 +7,7 @@ import { PeriodPicker } from '@/components/PeriodPicker'
 import { LogsPage } from '@/features/logs/LogsPage'
 import { useLifetimeTotals } from '@/hooks/useLifetimeTotals'
 import { TrendChart } from '@/features/trend/TrendChart'
-import { bucketLogs, buildSparkPath } from '@/features/trend/bucketing'
+import { bucketLogs, bucketQuotaData, buildSparkPath } from '@/features/trend/bucketing'
 import {
   useKpiData,
   type ModelStats,
@@ -306,9 +306,19 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
       data?.currentItems ? bucketLogs(data.currentItems, props.period) : null,
     [data?.currentItems, props.period]
   )
+  const quotaBuckets = useMemo(
+    () =>
+      data?.currentQuotaItems
+        ? bucketQuotaData(data.currentQuotaItems, props.period)
+        : null,
+    [data?.currentQuotaItems, props.period]
+  )
   const totalPath = useMemo(
-    () => (buckets ? buildSparkPath(buckets.buckets.map((b) => b.total)) : ''),
-    [buckets]
+    () =>
+      quotaBuckets
+        ? buildSparkPath(quotaBuckets.buckets.map((b) => b.total))
+        : '',
+    [quotaBuckets]
   )
   const inputPath = useMemo(
     () => (buckets ? buildSparkPath(buckets.buckets.map((b) => b.input)) : ''),
@@ -332,8 +342,9 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
     [buckets]
   )
   const costPath = useMemo(
-    () => (buckets ? buildSparkPath(buckets.buckets.map((b) => b.cost)) : ''),
-    [buckets]
+    () =>
+      quotaBuckets ? buildSparkPath(quotaBuckets.buckets.map((b) => b.cost)) : '',
+    [quotaBuckets]
   )
 
   const totalDelta = formatPercentDelta(curr?.total ?? 0, prev?.total ?? 0)
@@ -481,6 +492,7 @@ function MidGrid(props: { kpi: KpiQuery; period: Period }) {
     <section className='grid-main'>
       <TrendChart
         logs={props.kpi.data?.currentItems ?? []}
+        quotaRows={props.kpi.data?.currentQuotaItems ?? []}
         period={props.period}
         loading={props.kpi.loading}
         palette={MODEL_PALETTE}

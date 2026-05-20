@@ -1,8 +1,11 @@
+[variables]
+NPM_CONFIG_PRODUCTION = "false"
+
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm ci --include=dev --include=optional"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["node -e \"try{require('@rollup/rollup-linux-x64-gnu')}catch(e){process.exit(1)}\" || npm install --no-save @rollup/rollup-linux-x64-gnu@4.60.4", "npm run build"]
 
 [start]
 cmd = "npm run start"

@@ -38,8 +38,9 @@ export interface KpiData {
   previous: KpiPeriodTotals
   // per-model rollup of the current window, sorted desc by tokens
   byModel: ModelStats[]
-  // per-provider rollup; provider comes from .cc ingest's other.provider —
-  // only ingest-tagged logs contribute, which is exactly what we want.
+  // per-provider rollup; provider comes from .cc ingest's other.provider.
+  // If an old/native log missed that field, we infer from model name instead
+  // of showing a synthetic reconciliation bucket.
   byProvider: ProviderStats[]
   // raw current-window logs so the trend chart can bucket them locally;
   // surfaced here to avoid issuing a second /api/log request for the chart.
@@ -112,18 +113,25 @@ function rollupQuotaByModel(rows: QuotaDataItem[]): ModelStats[] {
   return Array.from(map.values()).sort((a, b) => b.tokens - a.tokens)
 }
 
-function rollupByProvider(
-  logs: UsageLog[],
-  authoritativeTotals?: KpiPeriodTotals
-): ProviderStats[] {
+function inferProviderFromModel(modelName: string): string | null {
+  const model = (modelName || '').toLowerCase()
+  if (!model || model === 'unknown') return null
+  if (model.includes('gemini')) return 'gemini'
+  if (model.includes('doubao') || model.startsWith('ep-')) return 'doubao'
+  if (model.includes('deepseek')) return 'deepseek'
+  if (model.includes('claude-code-micu')) return 'claude-code-micu'
+  if (model.includes('claude')) return 'micuapi'
+  if (model.includes('gpt-micu')) return 'gpt-micu'
+  if (model.startsWith('gpt-') || model.startsWith('o')) return 'micuapi'
+  return null
+}
+
+function rollupByProvider(logs: UsageLog[]): ProviderStats[] {
   const map = new Map<string, ProviderStats>()
   for (const log of logs) {
     const other = parseOther(log.other)
-    // Provider is only persisted in logs.other. quota_data does not carry this
-    // dimension, so provider attribution is log-derived and then reconciled
-    // against the authoritative /api/data totals below.
-    if (!other.provider) continue
-    const provider = other.provider
+    const provider = other.provider || inferProviderFromModel(log.model_name)
+    if (!provider) continue
     const input = Number(log.prompt_tokens) || 0
     const output = Number(log.completion_tokens) || 0
     const total = Number(other.total_tokens) || input + output
@@ -141,34 +149,7 @@ function rollupByProvider(
     map.set(provider, entry)
   }
 
-  const rows = Array.from(map.values())
-  if (authoritativeTotals) {
-    const attributed = rows.reduce(
-      (acc, row) => ({
-        calls: acc.calls + row.calls,
-        tokens: acc.tokens + row.tokens,
-        input: acc.input + row.input,
-        output: acc.output + row.output,
-        cached: acc.cached + row.cached,
-        cost: acc.cost + row.cost,
-      }),
-      { calls: 0, tokens: 0, input: 0, output: 0, cached: 0, cost: 0 }
-    )
-    const unattributed: ProviderStats = {
-      provider: 'Unattributed / non-.cc',
-      calls: Math.max(0, authoritativeTotals.requests - attributed.calls),
-      tokens: Math.max(0, authoritativeTotals.total - attributed.tokens),
-      input: Math.max(0, authoritativeTotals.input - attributed.input),
-      output: Math.max(0, authoritativeTotals.output - attributed.output),
-      cached: Math.max(0, authoritativeTotals.cached - attributed.cached),
-      cost: Math.max(0, authoritativeTotals.cost - attributed.cost),
-    }
-    if (unattributed.tokens > 0 || unattributed.calls > 0 || unattributed.cost > 0) {
-      rows.push(unattributed)
-    }
-  }
-
-  return rows.sort((a, b) => b.tokens - a.tokens)
+  return Array.from(map.values()).sort((a, b) => b.tokens - a.tokens)
 }
 
 async function fetchLogWindow(args: {
@@ -275,7 +256,7 @@ export function useKpiData(period: Period): UseKpiDataResult {
           current,
           previous,
           byModel: rollupQuotaByModel(currentQuotaItems),
-          byProvider: rollupByProvider(currentItems, current),
+          byProvider: rollupByProvider(currentItems),
           currentItems,
           currentQuotaItems,
           windowStart: period.start,

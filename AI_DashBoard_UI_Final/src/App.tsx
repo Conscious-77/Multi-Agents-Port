@@ -804,7 +804,7 @@ function CacheEfficiencyPanel(props: { kpi: KpiQuery }) {
   )
 }
 
-// ─── By Provider (.cc proxy fan-out) ───────────────────────────────────────
+// ─── By Provider (log attribution reconciled to /api/data totals) ─────────
 
 const PROVIDER_TOP_N = 6
 
@@ -837,12 +837,12 @@ function ProviderPanel(props: { kpi: KpiQuery }) {
   return (
     <section className='panel glass panel-pad provider-panel'>
       <div className='panel-title'>
-        By Provider <span className='panel-sub'>· .cc proxy fan-out</span>
+        By Provider <span className='panel-sub'>· attributed + unassigned</span>
       </div>
       {loading ? (
         <div className='provider-empty'>loading…</div>
       ) : list.length === 0 ? (
-        <div className='provider-empty'>No .cc ingest data in this window</div>
+        <div className='provider-empty'>No provider-attributed data in this window</div>
       ) : (
         <div className='provider-list'>
           <div className='provider-row provider-head'>

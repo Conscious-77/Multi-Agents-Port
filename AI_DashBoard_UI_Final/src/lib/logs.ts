@@ -24,6 +24,7 @@ export interface LogOther {
   cached_input_tokens?: number
   cache_miss_tokens?: number
   reasoning_tokens?: number
+  total_tokens?: number
   cache_tokens?: number // NewAPI native (Claude/Gemini path)
   cache_creation_tokens?: number
   cache_creation_tokens_5m?: number

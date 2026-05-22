@@ -46,11 +46,28 @@ const MODEL_PALETTE = [
 // Only the top-left ApiHealthPill is live — it confirms the Vite dev proxy
 // and the NewAPI backend session are reachable.
 export function App() {
+  // Mobile nav drawer state. On desktop the menu button is hidden, so this
+  // stays false and the sidebar renders inline in the shell grid.
+  const [navOpen, setNavOpen] = useState(false)
   return (
     <>
       <ApiHealthPill />
+      <button
+        type='button'
+        className='menu-button'
+        onClick={() => setNavOpen(true)}
+        aria-label='Open menu'
+      >
+        <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'>
+          <path d='M4 7h16M4 12h16M4 17h16' />
+        </svg>
+      </button>
+      <div
+        className={`sidebar-overlay${navOpen ? ' show' : ''}`}
+        onClick={() => setNavOpen(false)}
+      />
       <div className='shell'>
-        <Sidebar />
+        <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />
         <Main />
       </div>
     </>
@@ -59,22 +76,22 @@ export function App() {
 
 // ─── Sidebar ────────────────────────────────────────────────────────────────
 
-function Sidebar() {
+function Sidebar(props: { open?: boolean; onNavigate?: () => void }) {
   return (
-    <aside className='sidebar'>
+    <aside className={`sidebar${props.open ? ' open' : ''}`}>
       <div className='logo'>
         <div className='logo-mark' />
         <div className='logo-text'>Vyra</div>
       </div>
       <nav className='nav'>
-        <NavItem active label='Overview' icon={<IconHome />} />
-        <NavItem label='Models' icon={<IconCube />} />
-        <NavItem label='Agents' icon={<IconAgents />} />
-        <NavItem label='Cost Analysis' icon={<IconCost />} />
-        <NavItem label='Infrastructure' icon={<IconInfra />} />
-        <NavItem label='Alerts' icon={<IconBell />} />
-        <NavItem label='Reports' icon={<IconReport />} />
-        <NavItem label='Settings' icon={<IconSettings />} />
+        <NavItem active label='Overview' icon={<IconHome />} onClick={props.onNavigate} />
+        <NavItem label='Models' icon={<IconCube />} onClick={props.onNavigate} />
+        <NavItem label='Agents' icon={<IconAgents />} onClick={props.onNavigate} />
+        <NavItem label='Cost Analysis' icon={<IconCost />} onClick={props.onNavigate} />
+        <NavItem label='Infrastructure' icon={<IconInfra />} onClick={props.onNavigate} />
+        <NavItem label='Alerts' icon={<IconBell />} onClick={props.onNavigate} />
+        <NavItem label='Reports' icon={<IconReport />} onClick={props.onNavigate} />
+        <NavItem label='Settings' icon={<IconSettings />} onClick={props.onNavigate} />
       </nav>
       <div className='side-bottom'>
         <div className='plan'>
@@ -121,9 +138,17 @@ function UserCard() {
   )
 }
 
-function NavItem(props: { label: string; icon: React.ReactNode; active?: boolean }) {
+function NavItem(props: {
+  label: string
+  icon: React.ReactNode
+  active?: boolean
+  onClick?: () => void
+}) {
   return (
-    <div className={`nav-item${props.active ? ' active' : ''}`}>
+    <div
+      className={`nav-item${props.active ? ' active' : ''}`}
+      onClick={props.onClick}
+    >
       {props.icon}
       {props.label}
     </div>
@@ -628,8 +653,13 @@ function DonutPanel(props: {
             className={`r${hovered === row.name ? ' hovered' : ''}${
               hovered && hovered !== row.name ? ' dimmed' : ''
             }`}
-            onMouseEnter={() => setHovered(row.name)}
-            onMouseLeave={() => setHovered(null)}
+            onPointerEnter={(e) => {
+              if (e.pointerType === 'mouse') setHovered(row.name)
+            }}
+            onPointerLeave={(e) => {
+              if (e.pointerType === 'mouse') setHovered(null)
+            }}
+            onClick={() => setHovered(hovered === row.name ? null : row.name)}
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25, delay: i * 0.04, ease: 'easeOut' }}
@@ -709,7 +739,9 @@ function DonutSvg(props: {
       width={134}
       height={134}
       style={{ overflow: 'visible' }}
-      onMouseLeave={() => props.onHoverChange(null)}
+      onPointerLeave={(e) => {
+        if (e.pointerType === 'mouse') props.onHoverChange(null)
+      }}
     >
       {props.slices.map((s, i) => {
         const label = props.labels[i] ?? `slice-${i}`
@@ -732,7 +764,12 @@ function DonutSvg(props: {
             className={`donut-slice${dim ? ' dimmed' : ''}${isHover ? ' active' : ''}`}
             d={d}
             fill={s.color}
-            onMouseEnter={() => props.onHoverChange(label)}
+            onPointerEnter={(e) => {
+              if (e.pointerType === 'mouse') props.onHoverChange(label)
+            }}
+            onClick={() =>
+              props.onHoverChange(props.hoveredKey === label ? null : label)
+            }
             style={{ '--slice-color': s.color } as React.CSSProperties}
           />
         )

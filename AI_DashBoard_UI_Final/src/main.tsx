@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { LoginGate } from './components/LoginGate'
+import '@fontsource-variable/public-sans'
 import './index.css'
 
 const rootEl = document.getElementById('root')

@@ -11,6 +11,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@fontsource-variable/public-sans": "^5.2.7",
     "motion": "^12.39.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

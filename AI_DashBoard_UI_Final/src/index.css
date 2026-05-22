@@ -22,7 +22,7 @@
 html, body { height: 100%; }
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Public Sans Variable', 'Public Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--text);
   /* Soft periwinkle → light grey, 45° diagonal (per reference). */
   background: linear-gradient(45deg, #889dd3 0%, #d1d6de 100%);
@@ -289,7 +289,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   right: 8px;
   transform: translateY(-50%);
   font-size: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Public Sans Variable', 'Public Sans', sans-serif;
   color: rgba(28, 36, 64, 0.5);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -659,6 +659,125 @@ canvas { width: 100% !important; height: 100% !important; }
   .bottom-grid { grid-template-columns: 1fr; }
   .tabs { min-width: 520px; }
   .feed { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Mobile nav: hamburger button + slide-in drawer + scrim. Hidden on desktop;
+   activated only inside the ≤860px breakpoint below. */
+.menu-button {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 210;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: var(--text);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 16px rgba(40, 60, 110, 0.15);
+  cursor: pointer;
+}
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  /* plain dim scrim — no backdrop-filter (nesting it under the drawer's own
+     filter caused the whole view to blur). */
+  background: rgba(20, 25, 50, 0.42);
+}
+
+/* ── Tablet / large phone: sidebar becomes a slide-in drawer ── */
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+    width: calc(100vw - 16px);
+    margin: 8px;
+  }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 240px;
+    z-index: 200;
+    padding: 24px 18px 18px;
+    border-right: 1px solid rgba(40, 55, 100, 0.1);
+    border-radius: 0 18px 18px 0;
+    /* solid panel — no backdrop-filter so it never double-blurs with the scrim */
+    background: #eef1f8;
+    transform: translateX(-100%);
+    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 0 24px 60px rgba(20, 30, 60, 0.3);
+  }
+  .sidebar-overlay.show { display: block; }
+  .menu-button { display: inline-flex; }
+  .api-pill { display: none; }
+  .tabs { min-width: 0; }
+  /* leave room for the floating hamburger above the centered tabs */
+  .topbar { padding-left: 52px; }
+}
+
+/* ── Phone: stack everything, shrink the KPI grid ── */
+@media (max-width: 600px) {
+  main { padding: 16px 14px 18px; }
+  .topbar { justify-content: flex-start; overflow-x: auto; }
+  .tabs { min-width: max-content; }
+  .kpis { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .kpi { height: auto; min-height: 132px; }
+  .cache-grid { grid-template-columns: 1fr; }
+  .lifetime-grid { flex-wrap: wrap; gap: 14px 24px; }
+  /* keep the provider table readable: let it scroll horizontally */
+  .provider-list { overflow-x: auto; }
+  .provider-row { min-width: 520px; }
+
+  /* Lifetime controls (period picker + filter) can overrun 430px — let the
+     whole control cluster scroll horizontally instead of wrapping/clipping. */
+  .lifetime-controls {
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+  .period-picker { flex-shrink: 0; }
+
+  /* Trend header: the metric tabs + chart-type button are absolutely
+     positioned on desktop and collide with the title on a narrow panel.
+     Drop them back into normal flow, stacked under the title. */
+  .trend-panel .panel-title { position: static; margin-bottom: 10px; }
+  .trend-panel .chart-controls {
+    position: static;
+    display: inline-flex;
+    vertical-align: middle;
+    margin: 0 8px 10px 0;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .trend-panel .filter {
+    position: static;
+    display: inline-grid;
+    vertical-align: middle;
+    margin-bottom: 10px;
+  }
+
+  /* Donut panels stretch to match the trend chart height on the desktop grid.
+     On single-column mobile that stretch has nothing to match, so the fixed
+     288px min-height + flex-grow legend leaves a big empty gap. Let them size
+     to their content instead. */
+  .donut-panel { min-height: 0; }
+  .donut-list { flex: 0 0 auto; }
+}
+
+/* ── Small phone: single-column KPIs ── */
+@media (max-width: 400px) {
+  .kpis { grid-template-columns: 1fr; }
 }
 
 /* ─── Login page ─────────────────────────────────────────────────────── */
@@ -1059,7 +1178,7 @@ canvas { width: 100% !important; height: 100% !important; }
   bottom: 4px;
   font-size: 10px;
   color: rgba(28, 36, 64, 0.7);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Public Sans Variable', 'Public Sans', sans-serif;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -1104,7 +1223,7 @@ canvas { width: 100% !important; height: 100% !important; }
   padding: 3px 0;
 }
 .trend-tip-row b {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Public Sans Variable', 'Public Sans', sans-serif;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
   letter-spacing: -0.005em;

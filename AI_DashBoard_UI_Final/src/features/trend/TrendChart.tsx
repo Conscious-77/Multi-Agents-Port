@@ -300,7 +300,13 @@ function HoverColumns(props: Pick<ChartSvgProps, 'spec' | 'onHoverChange' | 'hov
   const inner = W - PAD_LEFT - PAD_RIGHT
   const colWidth = inner / Math.max(1, props.spec.count)
   return (
-    <g onMouseLeave={() => props.onHoverChange(null)}>
+    // Mouse: hover the column to preview. Touch: tap toggles the tooltip
+    // (pointerType guard avoids the synthetic mouse events a tap also fires).
+    <g
+      onPointerLeave={(e) => {
+        if (e.pointerType === 'mouse') props.onHoverChange(null)
+      }}
+    >
       {props.spec.labels.map((_, i) => (
         <rect
           key={i}
@@ -309,7 +315,10 @@ function HoverColumns(props: Pick<ChartSvgProps, 'spec' | 'onHoverChange' | 'hov
           width={colWidth}
           height={H}
           fill='transparent'
-          onMouseEnter={() => props.onHoverChange(i)}
+          onPointerEnter={(e) => {
+            if (e.pointerType === 'mouse') props.onHoverChange(i)
+          }}
+          onClick={() => props.onHoverChange(props.hoverIdx === i ? null : i)}
         />
       ))}
     </g>

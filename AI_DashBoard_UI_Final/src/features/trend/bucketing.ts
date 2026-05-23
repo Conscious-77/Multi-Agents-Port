@@ -2,8 +2,13 @@ import { parseOther, type UsageLog } from '@/lib/logs'
 import type { QuotaDataItem } from '@/lib/quota-data'
 import type { Period, PeriodKey } from '@/lib/period'
 
+const MINUTE = 60
 const HOUR = 3600
 const DAY = 24 * HOUR
+
+// Hard cap so an over-fine granularity (e.g. 1-minute over a long range) can't
+// generate a runaway number of buckets / DOM nodes.
+const MAX_BUCKETS = 1500
 
 export type TrendMetric = 'total' | 'input' | 'output' | 'cached'
 
@@ -13,9 +18,66 @@ export interface BucketSpec {
   labels: string[]
 }
 
+export interface Granularity {
+  sec: number
+  label: string
+}
+
+const GRANULARITY_OPTIONS: Granularity[] = [
+  { sec: MINUTE, label: '1m' },
+  { sec: 5 * MINUTE, label: '5m' },
+  { sec: HOUR, label: '1h' },
+  { sec: DAY, label: '1d' },
+]
+
+// Granularities that yield a sensible bucket count for the given window. Used
+// to populate the trend chart's granularity selector (alongside an "Auto"
+// default that defers to pickBuckets' per-preset choice).
+export function availableGranularities(period: Period): Granularity[] {
+  const span = Math.max(1, period.end - period.start)
+  return GRANULARITY_OPTIONS.filter((g) => {
+    const count = span / g.sec
+    return count >= 4 && count <= MAX_BUCKETS
+  })
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+// Build a spec for an explicit bucket size (the granularity-selector path).
+// Labels adapt to the size: minute → HH:MM, hour → HH:00 (prefixed with the
+// date when the window spans multiple days), day+ → M/D.
+function specFromSize(period: Period, sizeSec: number): BucketSpec {
+  const start = period.start
+  const span = Math.max(1, period.end - period.start)
+  const count = Math.max(1, Math.min(Math.ceil(span / sizeSec), MAX_BUCKETS))
+  const multiDay = span > 2 * DAY
+  const labels: string[] = []
+  for (let i = 0; i < count; i++) {
+    const d = new Date((start + i * sizeSec) * 1000)
+    if (sizeSec < HOUR) {
+      labels.push(`${pad2(d.getHours())}:${pad2(d.getMinutes())}`)
+    } else if (sizeSec < DAY) {
+      labels.push(
+        multiDay
+          ? `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}h`
+          : `${pad2(d.getHours())}:00`
+      )
+    } else {
+      labels.push(`${d.getMonth() + 1}/${d.getDate()}`)
+    }
+  }
+  return { count, sizeSec, labels }
+}
+
 // Pick a bucket granularity that gives a reasonable number of points for each
-// preset. The labels are tuned for the x-axis density.
-export function pickBuckets(period: Period): BucketSpec {
+// preset. The labels are tuned for the x-axis density. Passing sizeSecOverride
+// (from the granularity selector) bypasses the per-preset defaults.
+export function pickBuckets(period: Period, sizeSecOverride?: number): BucketSpec {
+  if (sizeSecOverride && sizeSecOverride > 0) {
+    return specFromSize(period, sizeSecOverride)
+  }
   const start = period.start
   const labels: string[] = []
   let count: number
@@ -110,9 +172,10 @@ function addQuota(target: MetricBucket, row: QuotaDataItem): void {
 // Aggregate-mode bucketing: one series for the whole dataset.
 export function bucketLogs(
   logs: UsageLog[],
-  period: Period
+  period: Period,
+  granularitySec?: number
 ): { spec: BucketSpec; buckets: MetricBucket[] } {
-  const spec = pickBuckets(period)
+  const spec = pickBuckets(period, granularitySec)
   const buckets = Array.from({ length: spec.count }, emptyBucket)
   for (const log of logs) {
     const idx = bucketIndex(log.created_at, period.start, spec.sizeSec, spec.count)
@@ -124,9 +187,10 @@ export function bucketLogs(
 
 export function bucketQuotaData(
   rows: QuotaDataItem[],
-  period: Period
+  period: Period,
+  granularitySec?: number
 ): { spec: BucketSpec; buckets: MetricBucket[] } {
-  const spec = pickBuckets(period)
+  const spec = pickBuckets(period, granularitySec)
   const buckets = Array.from({ length: spec.count }, emptyBucket)
   for (const row of rows) {
     const idx = bucketIndex(row.created_at, period.start, spec.sizeSec, spec.count)
@@ -151,9 +215,10 @@ export function bucketLogsByModel(
   logs: UsageLog[],
   period: Period,
   palette: string[],
-  topN = 4
+  topN = 4,
+  granularitySec?: number
 ): { spec: BucketSpec; series: ModelSeries[] } {
-  const spec = pickBuckets(period)
+  const spec = pickBuckets(period, granularitySec)
 
   // First pass: tally per-model totals to pick the top N.
   const tally = new Map<string, number>()
@@ -184,7 +249,7 @@ export function bucketLogsByModel(
   if (hasOthers) {
     othersEntry = {
       model: `Others (${ranked.length - topN})`,
-      color: '#c1b8ee',
+      color: '#a8a39c',
       buckets: Array.from({ length: spec.count }, emptyBucket),
       totalTokens: ranked.slice(topN).reduce((s, [, v]) => s + v, 0),
     }
@@ -210,9 +275,10 @@ export function bucketQuotaDataByModel(
   rows: QuotaDataItem[],
   period: Period,
   palette: string[],
-  topN = 4
+  topN = 4,
+  granularitySec?: number
 ): { spec: BucketSpec; series: ModelSeries[] } {
-  const spec = pickBuckets(period)
+  const spec = pickBuckets(period, granularitySec)
 
   const tally = new Map<string, number>()
   for (const row of rows) {
@@ -239,7 +305,7 @@ export function bucketQuotaDataByModel(
   if (hasOthers) {
     othersEntry = {
       model: `Others (${ranked.length - topN})`,
-      color: '#c1b8ee',
+      color: '#a8a39c',
       buckets: Array.from({ length: spec.count }, emptyBucket),
       totalTokens: ranked.slice(topN).reduce((s, [, v]) => s + v, 0),
     }

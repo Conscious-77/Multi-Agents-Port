@@ -21,6 +21,9 @@ export interface ModelStats {
   model: string
   calls: number
   tokens: number
+  cost: number
+  input: number
+  cached: number
 }
 
 export interface ProviderStats {
@@ -38,9 +41,11 @@ export interface KpiData {
   previous: KpiPeriodTotals
   // per-model rollup of the current window, sorted desc by tokens
   byModel: ModelStats[]
-  // per-provider rollup; provider comes from .cc ingest's other.provider.
-  // If an old/native log missed that field, we infer from model name instead
-  // of showing a synthetic reconciliation bucket.
+  // per-provider rollup. Tokens/calls/cost come from the SAME quota_data
+  // aggregate that byModel + the KPIs use (so the panel reconciles with the
+  // models page), regrouped by provider via a model→provider map learned from
+  // the logs. input/output/cached are enriched from the logs for the cache
+  // column.
   byProvider: ProviderStats[]
   // raw current-window logs so the trend chart can bucket them locally;
   // surfaced here to avoid issuing a second /api/log request for the chart.
@@ -101,14 +106,37 @@ function finalize(bucket: KpiPeriodTotals): void {
   bucket.cacheHitRate = bucket.input > 0 ? bucket.cached / bucket.input : 0
 }
 
-function rollupQuotaByModel(rows: QuotaDataItem[]): ModelStats[] {
+// Per-model rollup aligned with the models page (/dashboard/models): tokens,
+// calls and cost come from the quota_data aggregate (the authoritative source),
+// input/cached are enriched from the logs for the cache-hit column only.
+function rollupByModel(
+  quotaRows: QuotaDataItem[],
+  logs: UsageLog[]
+): ModelStats[] {
   const map = new Map<string, ModelStats>()
-  for (const row of rows) {
-    const model = row.model_name || 'unknown'
-    const entry = map.get(model) ?? { model, calls: 0, tokens: 0 }
-    entry.calls += Number(row.count) || 0
-    entry.tokens += Number(row.token_used) || 0
-    map.set(model, entry)
+  const ensure = (model: string): ModelStats => {
+    let e = map.get(model)
+    if (!e) {
+      e = { model, calls: 0, tokens: 0, cost: 0, input: 0, cached: 0 }
+      map.set(model, e)
+    }
+    return e
+  }
+  for (const row of quotaRows) {
+    const e = ensure(row.model_name || 'unknown')
+    e.calls += Number(row.count) || 0
+    e.tokens += Number(row.token_used) || 0
+    e.cost += Number(row.quota) || 0
+  }
+  // Enrich input/cached from logs; only touch models quota_data established so
+  // the model set + totals stay reconciled with the models page.
+  for (const log of logs) {
+    const e = map.get(log.model_name || 'unknown')
+    if (!e) continue
+    const other = parseOther(log.other)
+    e.input += Number(log.prompt_tokens) || 0
+    e.cached +=
+      Number(other.cached_input_tokens) || Number(other.cache_tokens) || 0
   }
   return Array.from(map.values()).sort((a, b) => b.tokens - a.tokens)
 }
@@ -126,27 +154,82 @@ function inferProviderFromModel(modelName: string): string | null {
   return null
 }
 
-function rollupByProvider(logs: UsageLog[]): ProviderStats[] {
-  const map = new Map<string, ProviderStats>()
+// Learn a model_name → provider mapping from the raw logs. The .cc ingest path
+// records the real upstream provider in other.provider; for models seen under
+// several providers we keep the most frequent. This lets us attach an accurate
+// provider to the quota_data aggregate, which carries no provider field.
+function buildModelProviderMap(logs: UsageLog[]): Map<string, string> {
+  const counts = new Map<string, Map<string, number>>()
   for (const log of logs) {
-    const other = parseOther(log.other)
-    const provider = other.provider || inferProviderFromModel(log.model_name)
+    const model = log.model_name || 'unknown'
+    const provider =
+      parseOther(log.other).provider || inferProviderFromModel(model)
     if (!provider) continue
-    const input = Number(log.prompt_tokens) || 0
-    const output = Number(log.completion_tokens) || 0
-    const total = Number(other.total_tokens) || input + output
-    const cached =
+    let inner = counts.get(model)
+    if (!inner) {
+      inner = new Map()
+      counts.set(model, inner)
+    }
+    inner.set(provider, (inner.get(provider) ?? 0) + 1)
+  }
+  const map = new Map<string, string>()
+  for (const [model, inner] of counts) {
+    let best = ''
+    let bestN = -1
+    for (const [prov, n] of inner) {
+      if (n > bestN) {
+        best = prov
+        bestN = n
+      }
+    }
+    if (best) map.set(model, best)
+  }
+  return map
+}
+
+// Provider rollup aligned with the models page. Tokens / calls / cost are
+// summed from the quota_data aggregate (the authoritative source the model
+// donut + KPIs use), just regrouped by provider — so the provider totals
+// reconcile exactly with the model totals. Every quota_data row is counted;
+// models with no learnable provider fall into an "other" bucket rather than
+// being dropped. input / output / cached are enriched from the logs (for the
+// cache-hit column only) and never introduce a provider absent from quota_data.
+function rollupByProvider(
+  quotaRows: QuotaDataItem[],
+  logs: UsageLog[]
+): ProviderStats[] {
+  const modelProvider = buildModelProviderMap(logs)
+  const providerOf = (model: string): string =>
+    modelProvider.get(model) || inferProviderFromModel(model) || 'other'
+
+  const map = new Map<string, ProviderStats>()
+  const ensure = (provider: string): ProviderStats => {
+    let e = map.get(provider)
+    if (!e) {
+      e = { provider, calls: 0, tokens: 0, input: 0, output: 0, cached: 0, cost: 0 }
+      map.set(provider, e)
+    }
+    return e
+  }
+
+  // Headline numbers from quota_data (authoritative, matches the models page).
+  for (const row of quotaRows) {
+    const entry = ensure(providerOf(row.model_name || 'unknown'))
+    entry.calls += Number(row.count) || 0
+    entry.tokens += Number(row.token_used) || 0
+    entry.cost += Number(row.quota) || 0
+  }
+
+  // Enrich input/output/cached from the logs. Only touch providers quota_data
+  // already established so the provider set (and totals) stay reconciled.
+  for (const log of logs) {
+    const entry = map.get(providerOf(log.model_name || 'unknown'))
+    if (!entry) continue
+    const other = parseOther(log.other)
+    entry.input += Number(log.prompt_tokens) || 0
+    entry.output += Number(log.completion_tokens) || 0
+    entry.cached +=
       Number(other.cached_input_tokens) || Number(other.cache_tokens) || 0
-    const entry =
-      map.get(provider) ??
-      { provider, calls: 0, tokens: 0, input: 0, output: 0, cached: 0, cost: 0 }
-    entry.calls += 1
-    entry.input += input
-    entry.output += output
-    entry.tokens += total
-    entry.cached += cached
-    entry.cost += Number(log.quota) || 0
-    map.set(provider, entry)
   }
 
   return Array.from(map.values()).sort((a, b) => b.tokens - a.tokens)
@@ -255,8 +338,8 @@ export function useKpiData(period: Period): UseKpiDataResult {
         setData({
           current,
           previous,
-          byModel: rollupQuotaByModel(currentQuotaItems),
-          byProvider: rollupByProvider(currentItems),
+          byModel: rollupByModel(currentQuotaItems, currentItems),
+          byProvider: rollupByProvider(currentQuotaItems, currentItems),
           currentItems,
           currentQuotaItems,
           windowStart: period.start,

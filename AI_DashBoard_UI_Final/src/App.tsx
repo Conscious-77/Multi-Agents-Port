@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { ApiHealthPill } from '@/components/ApiHealthPill'
 import { AnimatedValue } from '@/components/AnimatedValue'
@@ -11,7 +11,6 @@ import { bucketLogs, bucketQuotaData, buildSparkPath } from '@/features/trend/bu
 import {
   useKpiData,
   type ModelStats,
-  type ProviderStats,
 } from '@/hooks/useKpiData'
 import { clearUser, readUser } from '@/lib/auth'
 import {
@@ -29,15 +28,19 @@ import {
   type PeriodKey,
 } from '@/lib/period'
 
+// Low-saturation "muted" palette (Morandi-ish): distinct enough to tell models
+// apart, but soft so the charts read calm rather than rainbow. The first 4–5
+// (donut top-N + by-model lines) are the most separated hues; the rest fill the
+// "list all" breakdown table.
 const MODEL_PALETTE = [
-  '#4773ff',
-  '#67aefc',
-  '#6ac69b',
-  '#9e7cff',
-  '#ffad65',
-  '#ff7a9e',
-  '#5fdbd0',
-  '#c1b8ee',
+  '#5f8a8a', // muted teal
+  '#b58a64', // muted clay / tan
+  '#7a9670', // sage green
+  '#9a8198', // dusty mauve
+  '#b0746f', // dusty rose
+  '#8089a0', // muted blue-grey
+  '#bca96d', // muted khaki gold
+  '#94908c', // warm grey
 ]
 
 // First-pass App: a 1:1 React port of the Vyra HTML design.
@@ -45,6 +48,10 @@ const MODEL_PALETTE = [
 // happens in subsequent steps (KPI -> Trend -> Donuts -> Agent -> ...).
 // Only the top-left ApiHealthPill is live — it confirms the Vite dev proxy
 // and the NewAPI backend session are reachable.
+// Flip back to true to restore the sidebar, its mobile hamburger drawer, and
+// the two-column shell layout. Hidden per request.
+const SHOW_SIDEBAR: boolean = false
+
 export function App() {
   // Mobile nav drawer state. On desktop the menu button is hidden, so this
   // stays false and the sidebar renders inline in the shell grid.
@@ -52,22 +59,26 @@ export function App() {
   return (
     <>
       <ApiHealthPill />
-      <button
-        type='button'
-        className='menu-button'
-        onClick={() => setNavOpen(true)}
-        aria-label='Open menu'
-      >
-        <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'>
-          <path d='M4 7h16M4 12h16M4 17h16' />
-        </svg>
-      </button>
-      <div
-        className={`sidebar-overlay${navOpen ? ' show' : ''}`}
-        onClick={() => setNavOpen(false)}
-      />
-      <div className='shell'>
-        <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />
+      {SHOW_SIDEBAR && (
+        <button
+          type='button'
+          className='menu-button'
+          onClick={() => setNavOpen(true)}
+          aria-label='Open menu'
+        >
+          <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'>
+            <path d='M4 7h16M4 12h16M4 17h16' />
+          </svg>
+        </button>
+      )}
+      {SHOW_SIDEBAR && (
+        <div
+          className={`sidebar-overlay${navOpen ? ' show' : ''}`}
+          onClick={() => setNavOpen(false)}
+        />
+      )}
+      <div className={`shell${SHOW_SIDEBAR ? '' : ' no-sidebar'}`}>
+        {SHOW_SIDEBAR && <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />}
         <Main />
       </div>
     </>
@@ -239,7 +250,7 @@ function OverviewPage() {
       <KpisRow kpi={kpi} period={period} />
       <MidGrid kpi={kpi} period={period} />
       <CacheEfficiencyPanel kpi={kpi} />
-      <ProviderPanel kpi={kpi} />
+      <BreakdownPanel kpi={kpi} />
     </>
   )
 }
@@ -255,22 +266,13 @@ function LifetimeRow(props: {
   // Historical totals: always the full database aggregate, independent of the
   // PeriodPicker selection. Admin scope uses /api/data with no time cap;
   // non-admin scope falls back to the largest window NewAPI's user endpoint
-  // accepts (~30 days) and the sub-label flags that approximation.
-  const { data, loading, error } = useLifetimeTotals()
-
-  const sub = loading
-    ? 'aggregating…'
-    : error
-      ? error
-      : data?.scope === 'admin'
-        ? 'Every consume log in the database · independent of the filter on the right'
-        : 'Approx · last 30 days only (sign in as admin for the full lifetime)'
+  // accepts (~30 days).
+  const { data, loading } = useLifetimeTotals()
 
   return (
     <section className='lifetime-row glass'>
       <div className='lifetime-head'>
         <span className='lifetime-label'>Historical totals</span>
-        <span className='lifetime-sub'>{sub}</span>
       </div>
       <div className='lifetime-grid'>
         <LifetimeCell
@@ -394,7 +396,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatNumber(curr?.total ?? 0)}
         delta={loading ? 'loading…' : error ? error : totalDelta.text}
         deltaPositive={totalDelta.positive}
-        sparkColor='#5d8cff'
+        sparkColor='#5f8a8a'
         sparkPath={totalPath}
       />
       <KpiCard
@@ -404,7 +406,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatNumber(curr?.input ?? 0)}
         delta={loading ? 'loading…' : error ? '—' : inputDelta.text}
         deltaPositive={inputDelta.positive}
-        sparkColor='#6fb7ff'
+        sparkColor='#8089a0'
         sparkPath={inputPath}
       />
       <KpiCard
@@ -414,7 +416,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatNumber(curr?.output ?? 0)}
         delta={loading ? 'loading…' : error ? '—' : outputDelta.text}
         deltaPositive={outputDelta.positive}
-        sparkColor='#62d7b1'
+        sparkColor='#7a9670'
         sparkPath={outputPath}
       />
       <KpiCard
@@ -424,7 +426,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatNumber(curr?.cached ?? 0)}
         delta={loading ? 'loading…' : error ? '—' : cachedDelta.text}
         deltaPositive={cachedDelta.positive}
-        sparkColor='#b27aff'
+        sparkColor='#9a8198'
         sparkPath={cachedPath}
       />
       <KpiCard
@@ -434,7 +436,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatPercent(curr?.cacheHitRate ?? 0)}
         delta={loading ? 'loading…' : error ? '—' : hitRateDelta.text}
         deltaPositive={hitRateDelta.positive}
-        sparkColor='#b27aff'
+        sparkColor='#9a8198'
         sparkPath={hitRatePath}
       />
       <KpiCard
@@ -445,7 +447,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         delta={loading ? 'loading…' : error ? '—' : costDelta.text}
         // For cost, "up" is bad — flip the color semantic.
         deltaPositive={!costDelta.positive}
-        sparkColor='#ffad65'
+        sparkColor='#b58a64'
         sparkPath={costPath}
       />
     </section>
@@ -493,7 +495,7 @@ function KpiCard(props: KpiCardProps) {
       </div>
       {props.sparkPath && (
         <div className='mini'>
-          <svg className='spark' viewBox='0 0 160 42'>
+          <svg className='spark' viewBox='0 0 160 42' preserveAspectRatio='none'>
             <path stroke={props.sparkColor} d={props.sparkPath} />
           </svg>
         </div>
@@ -530,6 +532,7 @@ function MidGrid(props: { kpi: KpiQuery; period: Period }) {
         centerText='Total Calls'
         rows={callsModel.rows}
         slices={callsModel.slices}
+        othersDetail={callsModel.othersDetail}
         loading={props.kpi.loading}
       />
       <DonutPanel
@@ -539,6 +542,7 @@ function MidGrid(props: { kpi: KpiQuery; period: Period }) {
         centerText='Total Tokens'
         rows={tokensModel.rows}
         slices={tokensModel.slices}
+        othersDetail={tokensModel.othersDetail}
         loading={props.kpi.loading}
       />
     </section>
@@ -555,11 +559,12 @@ function buildDonut(
   rows: ModelStats[],
   field: 'calls' | 'tokens',
   total: number
-): { rows: DonutRow[]; slices: DonutSlice[] } {
+): { rows: DonutRow[]; slices: DonutSlice[]; othersDetail: DonutRow[] | null } {
   if (total <= 0) {
     return {
-      rows: [{ color: 'rgba(255,255,255,.28)', name: 'No data', value: '0', pct: '(0%)' }],
-      slices: [{ color: 'rgba(255,255,255,.28)', from: 0, to: 360 }],
+      rows: [{ color: 'rgba(40,55,100,.16)', name: 'No data', value: '0', pct: '(0%)' }],
+      slices: [{ color: 'rgba(40,55,100,.16)', from: 0, to: 360 }],
+      othersDetail: null,
     }
   }
 
@@ -578,7 +583,7 @@ function buildDonut(
     display.push({
       name: `Others (${rest.length})`,
       value: restSum,
-      color: '#c1b8ee',
+      color: '#a8a39c',
     })
   }
 
@@ -595,7 +600,22 @@ function buildDonut(
     value: formatNumber(entry.value),
     pct: `(${((entry.value / total) * 100).toFixed(1)}%)`,
   }))
-  return { rows: drows, slices }
+
+  // The individual models folded into the "Others" slice, so the legend can
+  // expand it on demand. They share the Others slice colour (they aren't drawn
+  // as separate ring slices), and their percentages are of the grand total.
+  const othersModels = rest.filter((m) => m[field] > 0)
+  const othersDetail: DonutRow[] | null =
+    othersModels.length > 0
+      ? othersModels.map((m) => ({
+          color: '#a8a39c',
+          name: m.model,
+          value: formatNumber(m[field]),
+          pct: `(${((m[field] / total) * 100).toFixed(1)}%)`,
+        }))
+      : null
+
+  return { rows: drows, slices, othersDetail }
 }
 
 function DonutPanel(props: {
@@ -605,11 +625,25 @@ function DonutPanel(props: {
   centerText: string
   rows: DonutRow[]
   slices: DonutSlice[]
+  othersDetail: DonutRow[] | null
   loading?: boolean
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
+  const [othersOpen, setOthersOpen] = useState(false)
   const dataKey = props.slices.map((s) => `${s.color}:${s.to.toFixed(1)}`).join('|')
-  const hoveredRow = hovered ? props.rows.find((r) => r.name === hovered) ?? null : null
+
+  const othersName = props.rows.find((r) => r.name.startsWith('Others'))?.name ?? null
+  const detail = props.othersDetail ?? []
+  const hasDetail = othersName !== null && detail.length > 0
+
+  // Center number resolves against both the top rows and any expanded sub-rows.
+  const hoveredRow = hovered
+    ? [...props.rows, ...detail].find((r) => r.name === hovered) ?? null
+    : null
+  // A sub-row hover keeps the single "Others" ring slice lit (sub-models aren't
+  // drawn as separate slices).
+  const isSubHover = hovered !== null && detail.some((r) => r.name === hovered)
+  const sliceHoverKey = isSubHover ? othersName : hovered
 
   return (
     <div className='panel glass panel-pad donut-panel'>
@@ -627,7 +661,7 @@ function DonutPanel(props: {
           <DonutSvg
             slices={props.slices}
             labels={props.rows.map((r) => r.name)}
-            hoveredKey={hovered}
+            hoveredKey={sliceHoverKey}
             onHoverChange={setHovered}
           />
           <div className='donut-center'>
@@ -647,31 +681,70 @@ function DonutPanel(props: {
         </motion.div>
       </div>
       <div className='donut-list'>
-        {props.rows.map((row, i) => (
-          <motion.div
-            key={row.name + i}
-            className={`r${hovered === row.name ? ' hovered' : ''}${
-              hovered && hovered !== row.name ? ' dimmed' : ''
-            }`}
-            onPointerEnter={(e) => {
-              if (e.pointerType === 'mouse') setHovered(row.name)
-            }}
-            onPointerLeave={(e) => {
-              if (e.pointerType === 'mouse') setHovered(null)
-            }}
-            onClick={() => setHovered(hovered === row.name ? null : row.name)}
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.25, delay: i * 0.04, ease: 'easeOut' }}
-          >
-            <span className='donut-row-name' title={row.name}>
-              <i style={{ background: row.color }} />
-              <span className='donut-row-name-text'>{row.name}</span>
-            </span>
-            <span>{row.value}</span>
-            <span>{row.pct}</span>
-          </motion.div>
-        ))}
+        {props.rows.map((row, i) => {
+          const isOthers = hasDetail && row.name === othersName
+          return (
+            <Fragment key={row.name + i}>
+              <motion.div
+                className={`r${hovered === row.name ? ' hovered' : ''}${
+                  hovered && hovered !== row.name ? ' dimmed' : ''
+                }${isOthers ? ' donut-row-toggle' : ''}`}
+                onPointerEnter={(e) => {
+                  if (e.pointerType === 'mouse') setHovered(row.name)
+                }}
+                onPointerLeave={(e) => {
+                  if (e.pointerType === 'mouse') setHovered(null)
+                }}
+                onClick={() =>
+                  isOthers
+                    ? setOthersOpen((v) => !v)
+                    : setHovered(hovered === row.name ? null : row.name)
+                }
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.25, delay: i * 0.04, ease: 'easeOut' }}
+              >
+                <span className='donut-row-name' title={row.name}>
+                  <i style={{ background: row.color }} />
+                  <span className='donut-row-name-text'>{row.name}</span>
+                  {isOthers && (
+                    <span
+                      className={`donut-caret${othersOpen ? ' open' : ''}`}
+                      aria-hidden='true'
+                    >
+                      ▾
+                    </span>
+                  )}
+                </span>
+                <span>{row.value}</span>
+                <span>{row.pct}</span>
+              </motion.div>
+              {isOthers && othersOpen &&
+                detail.map((sub, j) => (
+                  <motion.div
+                    key={`sub-${sub.name}-${j}`}
+                    className={`r donut-subrow${hovered === sub.name ? ' hovered' : ''}`}
+                    onPointerEnter={(e) => {
+                      if (e.pointerType === 'mouse') setHovered(sub.name)
+                    }}
+                    onPointerLeave={(e) => {
+                      if (e.pointerType === 'mouse') setHovered(null)
+                    }}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.18, delay: j * 0.025, ease: 'easeOut' }}
+                  >
+                    <span className='donut-row-name' title={sub.name}>
+                      <i style={{ background: sub.color }} />
+                      <span className='donut-row-name-text'>{sub.name}</span>
+                    </span>
+                    <span>{sub.value}</span>
+                    <span>{sub.pct}</span>
+                  </motion.div>
+                ))}
+            </Fragment>
+          )
+        })}
       </div>
     </div>
   )
@@ -841,59 +914,91 @@ function CacheEfficiencyPanel(props: { kpi: KpiQuery }) {
   )
 }
 
-// ─── By Provider ──────────────────────────────────────────────────────────
+// ─── Usage breakdown (by model / by provider) ──────────────────────────────
 
-const PROVIDER_TOP_N = 6
+type BreakdownMode = 'model' | 'provider'
 
-function ProviderPanel(props: { kpi: KpiQuery }) {
-  const fullList = props.kpi.data?.byProvider ?? []
+interface BreakdownEntry {
+  name: string
+  tokens: number
+  calls: number
+  input: number
+  cached: number
+  cost: number
+}
+
+// Per-model (default) / per-provider detail table. Both views read the same
+// quota_data-backed rollups the KPIs use, so their totals reconcile with the
+// models page.
+function BreakdownPanel(props: { kpi: KpiQuery }) {
+  const [mode, setMode] = useState<BreakdownMode>('model')
   const loading = props.kpi.loading
-  // Cap visible rows so a sudden surge in provider variety doesn't blow up
-  // the panel height; the rest are folded into a single "Others" row that
-  // still contributes to the totals.
-  const list = useMemo<ProviderStats[]>(() => {
-    if (fullList.length <= PROVIDER_TOP_N) return fullList
-    const top = fullList.slice(0, PROVIDER_TOP_N)
-    const rest = fullList.slice(PROVIDER_TOP_N)
-    const others = rest.reduce<ProviderStats>(
-      (acc, p) => ({
-        provider: `Others (${rest.length})`,
-        calls: acc.calls + p.calls,
-        tokens: acc.tokens + p.tokens,
-        input: acc.input + p.input,
-        output: acc.output + p.output,
-        cached: acc.cached + p.cached,
-        cost: acc.cost + p.cost,
-      }),
-      { provider: '', calls: 0, tokens: 0, input: 0, output: 0, cached: 0, cost: 0 }
-    )
-    return [...top, others]
-  }, [fullList])
-  const totalTokens = list.reduce((s, p) => s + p.tokens, 0)
+
+  const full = useMemo<BreakdownEntry[]>(() => {
+    if (mode === 'model') {
+      return (props.kpi.data?.byModel ?? []).map((m) => ({
+        name: m.model,
+        tokens: m.tokens,
+        calls: m.calls,
+        input: m.input,
+        cached: m.cached,
+        cost: m.cost,
+      }))
+    }
+    return (props.kpi.data?.byProvider ?? []).map((p) => ({
+      name: p.provider,
+      tokens: p.tokens,
+      calls: p.calls,
+      input: p.input,
+      cached: p.cached,
+      cost: p.cost,
+    }))
+  }, [mode, props.kpi.data])
+
+  // List every entry (no "Others" fold) — the list scrolls inside the panel
+  // when there are many rows.
+  const list = full
+  const totalTokens = list.reduce((s, e) => s + e.tokens, 0)
 
   return (
     <section className='panel glass panel-pad provider-panel'>
       <div className='panel-title'>
-        By Provider
+        <span>Usage by {mode === 'model' ? 'Model' : 'Provider'}</span>
+        <div className='breakdown-toggle'>
+          <button
+            type='button'
+            className={mode === 'model' ? 'on' : ''}
+            onClick={() => setMode('model')}
+          >
+            By model
+          </button>
+          <button
+            type='button'
+            className={mode === 'provider' ? 'on' : ''}
+            onClick={() => setMode('provider')}
+          >
+            By provider
+          </button>
+        </div>
       </div>
       {loading ? (
         <div className='provider-empty'>loading…</div>
       ) : list.length === 0 ? (
-        <div className='provider-empty'>No provider data in this window</div>
+        <div className='provider-empty'>No data in this window</div>
       ) : (
         <div className='provider-list'>
           <div className='provider-row provider-head'>
-            <span>Provider</span>
+            <span>{mode === 'model' ? 'Model' : 'Provider'}</span>
             <span>Tokens</span>
             <span>Share</span>
             <span>Calls</span>
             <span>Cache hit</span>
             <span>Cost</span>
           </div>
-          {list.map((p, i) => (
-            <ProviderRow
-              key={p.provider}
-              entry={p}
+          {list.map((e, i) => (
+            <BreakdownRowView
+              key={e.name}
+              entry={e}
               color={MODEL_PALETTE[i % MODEL_PALETTE.length]!}
               totalTokens={totalTokens}
               index={i}
@@ -905,28 +1010,28 @@ function ProviderPanel(props: { kpi: KpiQuery }) {
   )
 }
 
-function ProviderRow(props: {
-  entry: ProviderStats
+function BreakdownRowView(props: {
+  entry: BreakdownEntry
   color: string
   totalTokens: number
   index: number
 }) {
-  const p = props.entry
+  const e = props.entry
   const sharePct =
-    props.totalTokens > 0 ? (p.tokens / props.totalTokens) * 100 : 0
-  const hitPct = p.input > 0 ? p.cached / p.input : null
+    props.totalTokens > 0 ? (e.tokens / props.totalTokens) * 100 : 0
+  const hitPct = e.input > 0 ? e.cached / e.input : null
   return (
     <motion.div
       className='provider-row'
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.28, delay: props.index * 0.05, ease: 'easeOut' }}
+      transition={{ duration: 0.28, delay: Math.min(props.index, 12) * 0.04, ease: 'easeOut' }}
     >
-      <span className='provider-name' title={p.provider}>
+      <span className='provider-name' title={e.name}>
         <i style={{ background: props.color }} />
-        <span className='provider-name-text'>{p.provider}</span>
+        <span className='provider-name-text'>{e.name}</span>
       </span>
-      <span className='provider-num'>{formatNumber(p.tokens)}</span>
+      <span className='provider-num'>{formatNumber(e.tokens)}</span>
       <span className='provider-bar-cell'>
         <span className='provider-bar-track'>
           <span
@@ -936,11 +1041,11 @@ function ProviderRow(props: {
         </span>
         <span className='provider-pct'>{sharePct.toFixed(1)}%</span>
       </span>
-      <span className='provider-num'>{formatNumber(p.calls)}</span>
+      <span className='provider-num'>{formatNumber(e.calls)}</span>
       <span className='provider-num'>
         {hitPct !== null ? formatPercent(hitPct) : '—'}
       </span>
-      <span className='provider-num'>{formatCredit(p.cost)}</span>
+      <span className='provider-num'>{formatCredit(e.cost)}</span>
     </motion.div>
   )
 }

@@ -2,7 +2,7 @@
 
 :root {
   /* Light glassmorphism palette: dark text on white-frosted cards over a
-     soft periwinkle→grey background. */
+     near-white cool-grey background. */
   --line: rgba(40, 55, 100, 0.14);
   --line-soft: rgba(40, 55, 100, 0.08);
   --card: rgba(255, 255, 255, 0.62);
@@ -10,7 +10,7 @@
   --text: #1c2440;
   --muted: rgba(28, 36, 64, 0.62);
   --muted2: rgba(28, 36, 64, 0.42);
-  --blue: #4a6bff;
+  --blue: #2a3450;
   --cyan: #3f8fe0;
   --green: #2fae7a;
   --purple: #7a5cf0;
@@ -24,8 +24,10 @@ body {
   margin: 0;
   font-family: 'Public Sans Variable', 'Public Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--text);
-  /* Soft periwinkle → light grey, 45° diagonal (per reference). */
-  background: linear-gradient(45deg, #889dd3 0%, #d1d6de 100%);
+  /* Cool light-grey "desk surface". Deliberately a touch deeper than the cards
+     so the solid-white panels read as elevated above it (the crypto-wallet
+     reference does the same — white cards floating on a soft grey canvas). */
+  background: linear-gradient(160deg, #eef1f6 0%, #e1e7f0 100%);
   overflow: hidden;
 }
 body:before {
@@ -44,21 +46,32 @@ body:before {
   width: calc(100vw - 28px);
   height: calc(100vh - 22px);
   margin: 11px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 22px;
   display: grid;
   grid-template-columns: 242px 1fr;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.28);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 32px 80px rgba(40, 60, 110, 0.18);
+  /* Light wash, kept mostly transparent so the grey canvas shows through and
+     the white cards inside have something to sit above. */
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(40, 55, 100, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 32px 80px rgba(40, 60, 110, 0.16);
   backdrop-filter: blur(18px);
 }
+/* Sidebar hidden (SHOW_SIDEBAR=false): collapse the shell to a single column
+   so the main content spans the full width. */
+.shell.no-sidebar { grid-template-columns: 1fr; }
 
+/* Solid white elevated card. The old translucent "frosted glass" look had no
+   contrast against the near-white page (and its backdrop-blur had nothing to
+   blur), so cards vanished. A hairline grey edge + a two-layer soft shadow
+   (tight contact shadow + wide ambient) makes each panel read as lifted off
+   the grey canvas. */
 .glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.5));
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 18px 34px rgba(40, 60, 110, 0.1);
-  backdrop-filter: blur(18px) saturate(125%);
+  background: #ffffff;
+  border: 1px solid rgba(40, 55, 100, 0.07);
+  box-shadow:
+    0 1px 2px rgba(40, 60, 110, 0.05),
+    0 12px 28px rgba(40, 60, 110, 0.09);
 }
 
 .sidebar {
@@ -105,7 +118,7 @@ body:before {
 .plan .name { font-size: 13px; color: var(--text); margin-bottom: 4px; }
 .bar { height: 8px; background: rgba(40, 55, 100, 0.06); border-radius: 999px; overflow: hidden; margin: 10px 0 18px; }
 .bar > span { display: block; height: 100%; width: 78%; border-radius: 999px; background: linear-gradient(90deg, #f0f6ff, #8d79ff); }
-.upgrade { height: 48px; border-radius: 10px; background: rgba(40, 55, 100, 0.05); border: 1px solid rgba(40, 55, 100, 0.12); display: flex; align-items: center; justify-content: center; gap: 8px; color: #dce8ff; font-size: 13px; }
+.upgrade { height: 48px; border-radius: 10px; background: rgba(40, 55, 100, 0.05); border: 1px solid rgba(40, 55, 100, 0.12); display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--blue); font-size: 13px; }
 .user { height: 82px; border-radius: 12px; padding: 18px 14px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(40, 55, 100, 0.12); display: flex; align-items: center; gap: 13px; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #70a7ff, #4468ff); font-weight: 700; color: #fff; }
 .user .name { font-size: 14px; }
@@ -171,16 +184,16 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 .tab:hover { color: var(--text); }
 .tab.active {
   color: #fff;
-  background: linear-gradient(180deg, rgba(121, 163, 255, 0.62), rgba(55, 99, 210, 0.42));
+  background: linear-gradient(180deg, #3f4860, #1c2440);
   border: 1px solid rgba(40, 55, 100, 0.12);
-  box-shadow: 0 8px 18px rgba(25, 65, 160, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 18px rgba(28, 36, 64, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 .round { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: rgba(40, 55, 100, 0.06); border: 1px solid rgba(40, 55, 100, 0.12); color: var(--text); cursor: pointer; }
 .round:hover { background: rgba(255, 255, 255, 0.2); }
 .filter-wrapper { position: relative; }
 .filter-trigger { border: 1px solid rgba(40, 55, 100, 0.12); transition: background 0.15s ease, border-color 0.15s ease; }
 .filter-trigger.active {
-  background: linear-gradient(180deg, rgba(121, 163, 255, 0.85), rgba(55, 99, 210, 0.7));
+  background: linear-gradient(180deg, #3f4860, #1c2440);
   border-color: rgba(255, 255, 255, 0.4);
   color: #fff;
 }
@@ -221,11 +234,13 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 .kpi:after { content: ''; position: absolute; inset: auto -20px -40px -20px; height: 80px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0)); transform: skewY(-5deg); pointer-events: none; }
 .kpi-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
 .icon { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12); flex-shrink: 0; }
-.icon.blue { background: linear-gradient(135deg, #739cff, #315fff); }
-.icon.cyan { background: linear-gradient(135deg, #9bcaff, #397ded); }
-.icon.green { background: linear-gradient(135deg, #98ead0, #58bd96); }
-.icon.purple { background: linear-gradient(135deg, #cfb1ff, #8265ff); }
-.icon.orange { background: linear-gradient(135deg, #ffc692, #d06b3e); }
+/* Muted icon tones, each matched to its card's sparkline hue. (Class names kept
+   for stability; the values are now low-saturation, not literal blue/cyan/etc.) */
+.icon.blue { background: linear-gradient(135deg, #7da8a8, #517d7d); }   /* muted teal */
+.icon.cyan { background: linear-gradient(135deg, #9ba4bc, #6d7793); }   /* muted blue-grey */
+.icon.green { background: linear-gradient(135deg, #97ad8c, #688760); }  /* sage */
+.icon.purple { background: linear-gradient(135deg, #b4a0b2, #856d83); } /* dusty mauve */
+.icon.orange { background: linear-gradient(135deg, #cba588, #9d7350); } /* clay */
 .kpi-label { font-size: 13px; color: rgba(28, 36, 64, 0.84); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Value + delta share a row so each card can fit its sparkline below. The
@@ -258,7 +273,10 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 .mini { height: 38px; margin-top: auto; position: relative; z-index: 1; }
 .kpi .donut-small { position: absolute; right: 18px; bottom: 17px; width: 48px; height: 48px; border-radius: 50%; background: conic-gradient(#72e0c0 0 80deg, #668bff 80deg 260deg, rgba(255, 255, 255, 0.16) 260deg 360deg); }
 .donut-small:after { content: ''; position: absolute; inset: 9px; border-radius: 50%; background: #6083bc; }
-.spark path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* Fill the .mini box exactly so the viewBox maps 1:1 to the visible area
+   (no default-size letterboxing that left the line floating low). */
+.spark { display: block; width: 100%; height: 100%; }
+.spark path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .spark .fill { opacity: 0.08; }
 
 .grid-main { display: grid; grid-template-columns: 1.45fr 0.61fr 0.66fr; gap: 15px; margin-bottom: 14px; }
@@ -268,14 +286,14 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 .panel-sub { color: var(--muted); font-size: 13px; font-weight: 400; }
 .chart-controls { position: absolute; right: 48px; top: 16px; display: flex; height: 28px; border-radius: 16px; background: rgba(40, 55, 100, 0.05); border: 1px solid rgba(40, 55, 100, 0.12); padding: 2px; }
 .chart-controls span { padding: 0 13px; display: grid; place-items: center; border-radius: 13px; font-size: 12px; color: rgba(28, 36, 64, 0.78); cursor: pointer; }
-.chart-controls .on { background: rgba(92, 132, 255, 0.52); color: #fff; }
+.chart-controls .on { background: #2a3450; color: #fff; }
 .filter { position: absolute; right: 13px; top: 15px; width: 32px; height: 32px; border-radius: 14px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(40, 55, 100, 0.12); }
 .legend { display: flex; gap: 24px; font-size: 12px; color: rgba(28, 36, 64, 0.78); margin-bottom: 8px; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; }
 /* Trend area: 2-column grid (y-axis labels | chart). Fixed height so it
    never collides with siblings, even when MidGrid is stretched. */
 .trend-wrap {
-  height: 220px;
+  height: 264px;
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
   position: relative;
@@ -299,11 +317,6 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   min-width: 0;
   height: 100%;
 }
-.tooltip { position: absolute; right: 74px; top: 94px; width: 170px; border-radius: 8px; background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(40, 55, 100, 0.12); backdrop-filter: blur(12px); padding: 12px 14px; font-size: 12px; box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16); }
-.tooltip .time { text-align: center; font-weight: 700; margin-bottom: 9px; }
-.tip-row { display: flex; justify-content: space-between; margin: 7px 0; color: var(--text); }
-.tip-row i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; }
-.vline { position: absolute; left: 64%; top: 52px; height: 172px; border-left: 1px dashed rgba(255, 255, 255, 0.32); }
 
 /* Let grid stretch decide the row height; donut sits at the top, legend fills
    the rest. Removing the hard 288px stops the donut row from being shorter
@@ -324,7 +337,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   width: 134px;
   height: 134px;
   position: relative;
-  filter: drop-shadow(0 0 24px rgba(95, 145, 255, 0.16));
+  filter: drop-shadow(0 0 22px rgba(60, 64, 78, 0.14));
 }
 .donut-slice {
   cursor: pointer;
@@ -351,7 +364,9 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 }
 .donut-num { font-size: 24px; font-weight: 600; }
 .donut-text { font-size: 12px; color: var(--muted); margin-top: 6px; }
-.donut-list { font-size: 12px; line-height: 1.9; color: rgba(28, 36, 64, 0.84); flex: 1 1 auto; }
+.donut-list { font-size: 12px; line-height: 1.9; color: rgba(28, 36, 64, 0.84); flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.donut-list::-webkit-scrollbar { width: 6px; }
+.donut-list::-webkit-scrollbar-thumb { background: rgba(40, 55, 100, 0.12); border-radius: 3px; }
 .donut-list .r {
   display: grid;
   grid-template-columns: 1fr 66px 50px;
@@ -378,6 +393,25 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Expandable "Others" row: a caret that points right when collapsed, down when
+   open, plus indented child rows listing the folded-in models. */
+.donut-caret {
+  margin-left: 6px;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--muted2);
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+  transition: transform 0.18s ease;
+}
+.donut-caret.open { transform: rotate(0deg); }
+.donut-list .r.donut-subrow {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.donut-list .r.donut-subrow .donut-row-name { padding-left: 16px; }
+.donut-list .r.donut-subrow i { width: 6px; height: 6px; opacity: 0.75; }
 
 /* Cache Efficiency: compact single-row layout. Each "card" is now a
    horizontal label · value · delta strip; the whole panel sits at one row
@@ -426,7 +460,45 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 
 /* ─── By Provider panel ───────────────────────────────────────────────── */
 .provider-panel { margin-bottom: 12px; }
-.provider-list { display: flex; flex-direction: column; gap: 4px; }
+/* Breakdown panel mode switch (By model / By provider), pinned to the right of
+   the panel title. */
+.breakdown-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  height: 26px;
+  padding: 2px;
+  border-radius: 13px;
+  background: rgba(40, 55, 100, 0.05);
+  border: 1px solid rgba(40, 55, 100, 0.12);
+}
+.breakdown-toggle button {
+  height: 22px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  border-radius: 11px;
+  color: rgba(28, 36, 64, 0.7);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.breakdown-toggle button:hover { color: var(--text); }
+.breakdown-toggle button.on {
+  background: linear-gradient(180deg, #3f4860, #1c2440);
+  color: #fff;
+}
+.provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Show every row but keep the panel compact — long lists scroll internally. */
+  max-height: 384px;
+  overflow-y: auto;
+}
+.provider-list::-webkit-scrollbar { width: 6px; }
+.provider-list::-webkit-scrollbar-thumb { background: rgba(40, 55, 100, 0.12); border-radius: 3px; }
 .provider-row {
   display: grid;
   grid-template-columns: 1.3fr 1fr 2fr 0.7fr 0.9fr 0.9fr;
@@ -449,6 +521,12 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   margin-bottom: 4px;
   border-bottom: 1px solid rgba(40, 55, 100, 0.12);
   letter-spacing: 0.02em;
+  /* Stay visible while the rows below scroll. White bg covers rows passing
+     under it; the solid-white card means #fff matches the panel surface. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
 }
 .provider-name {
   display: inline-flex;
@@ -723,6 +801,8 @@ canvas { width: 100% !important; height: 100% !important; }
   .tabs { min-width: 0; }
   /* leave room for the floating hamburger above the centered tabs */
   .topbar { padding-left: 52px; }
+  /* ...unless the sidebar (and its hamburger) is hidden */
+  .shell.no-sidebar .topbar { padding-left: 0; }
 }
 
 /* ── Phone: stack everything, shrink the KPI grid ── */
@@ -852,7 +932,7 @@ canvas { width: 100% !important; height: 100% !important; }
 }
 
 .login-field input:focus {
-  border-color: rgba(121, 163, 255, 0.7);
+  border-color: rgba(31, 36, 64, 0.5);
   background: rgba(40, 55, 100, 0.06);
 }
 
@@ -869,13 +949,13 @@ canvas { width: 100% !important; height: 100% !important; }
   height: 42px;
   border-radius: 11px;
   border: 1px solid rgba(40, 55, 100, 0.12);
-  background: linear-gradient(180deg, rgba(121, 163, 255, 0.78), rgba(55, 99, 210, 0.66));
+  background: linear-gradient(180deg, #3f4860, #1c2440);
   color: #fff;
   font-weight: 650;
   font-size: 14px;
   letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 10px 22px rgba(35, 79, 178, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: 0 10px 22px rgba(28, 36, 64, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   transition: transform 0.06s ease, opacity 0.12s ease;
 }
 
@@ -932,7 +1012,7 @@ canvas { width: 100% !important; height: 100% !important; }
   position: absolute;
   inset: 0;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(121, 163, 255, 0.62), rgba(55, 99, 210, 0.42));
+  background: linear-gradient(180deg, #3f4860, #1c2440);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
   z-index: 0;
 }
@@ -981,24 +1061,25 @@ canvas { width: 100% !important; height: 100% !important; }
   height: 34px;
   padding: 0 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(40, 55, 100, 0.05);
   border: 1px solid rgba(40, 55, 100, 0.12);
   color: var(--text);
   font-family: inherit;
   font-size: 13px;
   outline: none;
-  color-scheme: dark;
+  /* Light theme: keep the native date picker chrome (icon, calendar) light. */
+  color-scheme: light;
   text-transform: none;
 }
 .period-popover-field input[type='date']:focus {
-  border-color: rgba(121, 163, 255, 0.7);
+  border-color: rgba(31, 36, 64, 0.5);
   background: rgba(40, 55, 100, 0.06);
 }
 .period-popover-apply {
   height: 34px;
   border-radius: 8px;
   border: 1px solid rgba(40, 55, 100, 0.12);
-  background: linear-gradient(180deg, rgba(121, 163, 255, 0.62), rgba(55, 99, 210, 0.42));
+  background: linear-gradient(180deg, #3f4860, #1c2440);
   color: #fff;
   font-weight: 600;
   font-size: 12.5px;
@@ -1020,6 +1101,11 @@ canvas { width: 100% !important; height: 100% !important; }
   align-items: center;
   justify-content: space-between;
   gap: 18px;
+  /* Lift this row (and the date-range / custom popovers it hosts) above the
+     KPI + panel cards that follow it in the DOM. Without this the popover gets
+     painted under the opaque white cards below. */
+  position: relative;
+  z-index: 40;
 }
 .lifetime-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex-shrink: 0; }
 .lifetime-label {
@@ -1094,6 +1180,41 @@ canvas { width: 100% !important; height: 100% !important; }
 }
 .trend-legend > span > i { flex-shrink: 0; }
 
+/* Right cluster of the trend toolbar: granularity selector + aggregated/by-model
+   toggle. Allowed to wrap under the legend on a narrow panel. */
+.trend-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.trend-gran {
+  display: inline-flex;
+  height: 24px;
+  padding: 2px;
+  border-radius: 12px;
+  background: rgba(40, 55, 100, 0.05);
+  border: 1px solid rgba(40, 55, 100, 0.12);
+}
+.trend-gran-opt {
+  height: 20px;
+  padding: 0 9px;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  color: rgba(28, 36, 64, 0.7);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.trend-gran-opt:hover { color: var(--text); }
+.trend-gran-opt.on {
+  background: linear-gradient(180deg, #3f4860, #1c2440);
+  color: #fff;
+}
+
 .trend-toggle {
   height: 24px;
   padding: 0 12px;
@@ -1110,7 +1231,7 @@ canvas { width: 100% !important; height: 100% !important; }
 }
 .trend-toggle:hover { background: rgba(40, 55, 100, 0.06); }
 .trend-toggle.on {
-  background: linear-gradient(180deg, rgba(121, 163, 255, 0.52), rgba(55, 99, 210, 0.36));
+  background: linear-gradient(180deg, #3f4860, #1c2440);
   color: #fff;
   border-color: rgba(28, 36, 64, 0.28);
 }
@@ -1154,7 +1275,9 @@ canvas { width: 100% !important; height: 100% !important; }
   bottom: 26px;
   width: 1px;
   margin-left: -0.5px;
-  border-left: 1px dashed rgba(255, 255, 255, 0.35);
+  /* Dark dashed guide so it reads against the white panel (was white, which
+     was invisible after the light-theme background switch). */
+  border-left: 1px dashed rgba(40, 55, 100, 0.3);
   pointer-events: none;
   opacity: 0;
   transition:

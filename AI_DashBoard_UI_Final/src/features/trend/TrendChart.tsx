@@ -5,6 +5,7 @@ import type { QuotaDataItem } from '@/lib/quota-data'
 import { formatNumber } from '@/lib/format'
 import type { Period } from '@/lib/period'
 import {
+  availableGranularities,
   bucketLogs,
   bucketLogsByModel,
   bucketQuotaData,
@@ -26,10 +27,10 @@ interface TrendChartProps {
 }
 
 const METRIC_COLOR: Record<TrendMetric, string> = {
-  total: '#6fa6ff',
-  input: '#66d0ad',
-  output: '#b078ff',
-  cached: '#ffad65',
+  total: '#5f8a8a',
+  input: '#7a9670',
+  output: '#9a8198',
+  cached: '#b58a64',
 }
 
 const METRIC_LABEL: Record<TrendMetric, string> = {
@@ -51,22 +52,28 @@ export function TrendChart(props: TrendChartProps) {
   const [chartType, setChartType] = useState<ChartType>('line')
   const [byModel, setByModel] = useState<boolean>(false)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  // null = "Auto" (defer to the per-preset default in pickBuckets).
+  const [granSec, setGranSec] = useState<number | null>(null)
 
+  const granOptions = useMemo(
+    () => availableGranularities(props.period),
+    [props.period]
+  )
   const aggregate = useMemo(
     () =>
       metric === 'total'
-        ? bucketQuotaData(props.quotaRows, props.period)
-        : bucketLogs(props.logs, props.period),
-    [metric, props.logs, props.quotaRows, props.period]
+        ? bucketQuotaData(props.quotaRows, props.period, granSec ?? undefined)
+        : bucketLogs(props.logs, props.period, granSec ?? undefined),
+    [metric, props.logs, props.quotaRows, props.period, granSec]
   )
   const grouped = useMemo(
     () =>
       byModel
         ? metric === 'total'
-          ? bucketQuotaDataByModel(props.quotaRows, props.period, props.palette)
-          : bucketLogsByModel(props.logs, props.period, props.palette)
+          ? bucketQuotaDataByModel(props.quotaRows, props.period, props.palette, 4, granSec ?? undefined)
+          : bucketLogsByModel(props.logs, props.period, props.palette, 4, granSec ?? undefined)
         : null,
-    [byModel, metric, props.logs, props.quotaRows, props.period, props.palette]
+    [byModel, metric, props.logs, props.quotaRows, props.period, props.palette, granSec]
   )
 
   const series: ModelSeries[] = useMemo(() => {
@@ -101,10 +108,16 @@ export function TrendChart(props: TrendChartProps) {
   // points at the same bucket / series.
   useEffect(() => {
     setHoverIdx(null)
-  }, [metric, chartType, byModel, props.period.key])
+  }, [metric, chartType, byModel, props.period.key, granSec])
+
+  // Reset to Auto granularity when the period changes — the previous explicit
+  // size may no longer be one of the offered options.
+  useEffect(() => {
+    setGranSec(null)
+  }, [props.period.key])
 
   // Composite key used by AnimatePresence to cross-fade between chart layouts.
-  const chartKey = `${chartType}-${metric}-${byModel ? 'm' : 'a'}-${props.period.key}`
+  const chartKey = `${chartType}-${metric}-${byModel ? 'm' : 'a'}-${props.period.key}-${granSec ?? 'auto'}`
 
   return (
     <div className='panel glass panel-pad trend-panel'>
@@ -144,13 +157,36 @@ export function TrendChart(props: TrendChartProps) {
             </span>
           ))}
         </div>
-        <button
-          type='button'
-          className={`trend-toggle${byModel ? ' on' : ''}`}
-          onClick={() => setByModel((v) => !v)}
-        >
-          {byModel ? 'By model' : 'Aggregated'}
-        </button>
+        <div className='trend-toolbar-right'>
+          {granOptions.length > 0 && (
+            <div className='trend-gran' role='group' aria-label='Bucket granularity'>
+              <button
+                type='button'
+                className={`trend-gran-opt${granSec === null ? ' on' : ''}`}
+                onClick={() => setGranSec(null)}
+              >
+                Auto
+              </button>
+              {granOptions.map((g) => (
+                <button
+                  key={g.sec}
+                  type='button'
+                  className={`trend-gran-opt${granSec === g.sec ? ' on' : ''}`}
+                  onClick={() => setGranSec(g.sec)}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type='button'
+            className={`trend-toggle${byModel ? ' on' : ''}`}
+            onClick={() => setByModel((v) => !v)}
+          >
+            {byModel ? 'By model' : 'Aggregated'}
+          </button>
+        </div>
       </div>
 
       <div className='trend-wrap'>
@@ -272,7 +308,10 @@ export function TrendAxisLabels(props: { spec: ChartSvgProps['spec'] }) {
   return (
     <div className='trend-axis-labels'>
       {props.spec.labels.map((label, i) => {
-        if (i % stride !== 0 && i !== props.spec.count - 1) return null
+        // Only strided ticks. We deliberately don't force-show the last index:
+        // on the hourly view it sat 2h after the previous tick (21:00 → 23:00)
+        // and looked crowded/uneven against the otherwise 3h spacing.
+        if (i % stride !== 0) return null
         const xPct = (xAt(i, props.spec.count) / W) * 100
         const transform =
           i === 0
@@ -325,9 +364,76 @@ function HoverColumns(props: Pick<ChartSvgProps, 'spec' | 'onHoverChange' | 'hov
   )
 }
 
+// Monotone-cubic interpolation (d3's curveMonotoneX). Produces a smooth line
+// that passes through every data point without overshooting — important for
+// spiky token data where a plain Catmull-Rom would bulge above peaks or dip
+// below the baseline between points.
+function buildSmoothPath(pts: { x: number; y: number }[]): string {
+  const n = pts.length
+  if (n === 0) return ''
+  if (n === 1) return `M${pts[0]!.x.toFixed(1)} ${pts[0]!.y.toFixed(1)}`
+  if (n === 2) {
+    return `M${pts[0]!.x.toFixed(1)} ${pts[0]!.y.toFixed(1)} L${pts[1]!.x.toFixed(1)} ${pts[1]!.y.toFixed(1)}`
+  }
+
+  const slope: number[] = []
+  for (let i = 0; i < n - 1; i++) {
+    const hx = pts[i + 1]!.x - pts[i]!.x
+    slope.push(hx !== 0 ? (pts[i + 1]!.y - pts[i]!.y) / hx : 0)
+  }
+
+  const m: number[] = new Array(n)
+  m[0] = slope[0]!
+  m[n - 1] = slope[n - 2]!
+  for (let i = 1; i < n - 1; i++) {
+    m[i] = slope[i - 1]! * slope[i]! <= 0 ? 0 : (slope[i - 1]! + slope[i]!) / 2
+  }
+  // Fritsch–Carlson correction: clamp tangents so the curve stays monotone
+  // between points (no overshoot).
+  for (let i = 0; i < n - 1; i++) {
+    if (slope[i] === 0) {
+      m[i] = 0
+      m[i + 1] = 0
+    } else {
+      const a = m[i]! / slope[i]!
+      const b = m[i + 1]! / slope[i]!
+      const s = a * a + b * b
+      if (s > 9) {
+        const t = 3 / Math.sqrt(s)
+        m[i] = t * a * slope[i]!
+        m[i + 1] = t * b * slope[i]!
+      }
+    }
+  }
+
+  let d = `M${pts[0]!.x.toFixed(1)} ${pts[0]!.y.toFixed(1)}`
+  for (let i = 0; i < n - 1; i++) {
+    const h = pts[i + 1]!.x - pts[i]!.x
+    const c1x = pts[i]!.x + h / 3
+    const c1y = pts[i]!.y + (m[i]! * h) / 3
+    const c2x = pts[i + 1]!.x - h / 3
+    const c2y = pts[i + 1]!.y - (m[i + 1]! * h) / 3
+    d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${pts[i + 1]!.x.toFixed(1)} ${pts[i + 1]!.y.toFixed(1)}`
+  }
+  return d
+}
+
 function LineChartSvg(props: ChartSvgProps) {
   const max = props.max
   const baseY = yAt(0, max)
+
+  const paths = props.series.map((s) => {
+    const pts = s.buckets.map((b, i) => ({
+      x: xAt(i, props.spec.count),
+      y: yAt(pickMetric(b, props.metric), max),
+    }))
+    const lineD = buildSmoothPath(pts)
+    const areaD =
+      pts.length > 0
+        ? `${lineD} L${pts[pts.length - 1]!.x.toFixed(1)} ${baseY.toFixed(1)} L${pts[0]!.x.toFixed(1)} ${baseY.toFixed(1)} Z`
+        : ''
+    return { lineD, areaD }
+  })
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio='none' style={{ width: '100%', height: '100%' }}>
@@ -335,18 +441,11 @@ function LineChartSvg(props: ChartSvgProps) {
 
       {/* Area fills first so lines and dots sit on top. */}
       {props.series.map((s, sIdx) => {
-        const pts = s.buckets.map((b, i) => ({
-          x: xAt(i, props.spec.count),
-          y: yAt(pickMetric(b, props.metric), max),
-        }))
-        const areaD =
-          pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') +
-          ` L ${pts[pts.length - 1]!.x.toFixed(1)} ${baseY.toFixed(1)} L ${pts[0]!.x.toFixed(1)} ${baseY.toFixed(1)} Z`
         const opacity = props.series.length === 1 ? 0.22 : 0.08
         return (
           <motion.path
             key={`area-${s.model}-${sIdx}`}
-            d={areaD}
+            d={paths[sIdx]!.areaD}
             fill={s.color}
             initial={{ opacity: 0 }}
             animate={{ opacity }}
@@ -356,39 +455,32 @@ function LineChartSvg(props: ChartSvgProps) {
       })}
 
       {/* Lines — drawn with a path-length sweep */}
-      {props.series.map((s, sIdx) => {
-        const path = s.buckets
-          .map((b, i) => {
-            const x = xAt(i, props.spec.count)
-            const y = yAt(pickMetric(b, props.metric), max)
-            return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`
-          })
-          .join(' ')
-        return (
-          <motion.path
-            key={`line-${s.model}-${sIdx}`}
-            d={path}
-            fill='none'
-            stroke={s.color}
-            strokeWidth='2.2'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{
-              pathLength: { duration: 0.65, ease: 'easeOut', delay: sIdx * 0.05 },
-              opacity: { duration: 0.18, delay: sIdx * 0.05 },
-            }}
-          />
-        )
-      })}
+      {props.series.map((s, sIdx) => (
+        <motion.path
+          key={`line-${s.model}-${sIdx}`}
+          d={paths[sIdx]!.lineD}
+          fill='none'
+          stroke={s.color}
+          strokeWidth='2.2'
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{
+            pathLength: { duration: 0.65, ease: 'easeOut', delay: sIdx * 0.05 },
+            opacity: { duration: 0.18, delay: sIdx * 0.05 },
+          }}
+        />
+      ))}
 
-      {/* Dots at each data point */}
+      {/* Dots at each data point. On dense (minute-level) views drawing a dot
+          per bucket is noisy and slow, so we only keep the hovered one. */}
       {props.series.map((s, sIdx) =>
         s.buckets.map((b, i) => {
           const v = pickMetric(b, props.metric)
           if (v <= 0) return null
           const isHover = props.hoverIdx === i
+          if (props.spec.count > 60 && !isHover) return null
           // r/strokeWidth are plain attributes so CSS transition on .trend-dot
           // can smooth them; mount-time entry stays under motion's control.
           return (
@@ -398,7 +490,7 @@ function LineChartSvg(props: ChartSvgProps) {
               cx={xAt(i, props.spec.count)}
               cy={yAt(v, max)}
               r={isHover ? 4.2 : 2.4}
-              fill='#0d2654'
+              fill='#3c3b3e'
               stroke={s.color}
               strokeWidth={isHover ? 2 : 1.6}
               initial={{ opacity: 0 }}
@@ -455,7 +547,9 @@ function BarChartSvg(props: ChartSvgProps) {
               animate={{ y, height }}
               transition={{
                 duration: 0.42,
-                delay: i * 0.012 + sIdx * 0.04,
+                // Cap the per-bar stagger so a dense window doesn't spread the
+                // entry animation over many seconds.
+                delay: Math.min(i, 40) * 0.012 + sIdx * 0.04,
                 ease: [0.22, 1, 0.36, 1],
               }}
             />

@@ -213,6 +213,25 @@ export function buildUpstreamRequest({ provider, requestPath, body }) {
     };
   }
 
+  if (provider === 'claude-yunwu-float') {
+    if (!process.env.CLAUDE_YUNWU_FLOAT_API_KEY) {
+      throw makeHttpError("Missing 'CLAUDE_YUNWU_FLOAT_API_KEY' environment variable", 500);
+    }
+
+    return {
+      provider: 'claude-yunwu-float',
+      modelFallback: body.model,
+      apiUrl: buildCompatibleUrl('https://yunwu.ai', requestPath, 'v1/chat/completions'),
+      headers: {
+        Authorization: `Bearer ${process.env.CLAUDE_YUNWU_FLOAT_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: withOpenAICompatibleStreamUsage(body),
+      requestPath: requestPath || 'v1/chat/completions',
+      errorLabel: 'Claude Yunwu Float',
+    };
+  }
+
   if (provider === 'openai') {
     if (!requestPath) {
       throw makeHttpError("Missing 'path' parameter", 400);

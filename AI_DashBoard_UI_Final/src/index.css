@@ -1,46 +1,50 @@
 @import 'tailwindcss';
 
 :root {
-  /* Light glassmorphism palette: dark text on white-frosted cards over a
-     near-white cool-grey background. */
-  --line: rgba(40, 55, 100, 0.14);
-  --line-soft: rgba(40, 55, 100, 0.08);
-  --card: rgba(255, 255, 255, 0.62);
-  --card-2: rgba(255, 255, 255, 0.45);
-  --text: #1c2440;
-  --muted: rgba(28, 36, 64, 0.62);
-  --muted2: rgba(28, 36, 64, 0.42);
-  --blue: #2a3450;
-  --cyan: #3f8fe0;
-  --green: #2fae7a;
-  --purple: #7a5cf0;
-  --orange: #e08a3a;
-  --on-accent: #ffffff;
+  /* iOS HIG light-mode palette (UIKit semantic colors). */
+  /* Text */
+  --text: #1C1C1E;                          /* label */
+  --muted: rgba(60, 60, 67, 0.6);           /* secondaryLabel */
+  --muted2: rgba(60, 60, 67, 0.3);          /* tertiaryLabel */
+  /* Separators / hairlines */
+  --line: rgba(60, 60, 67, 0.29);           /* separator */
+  --line-soft: rgba(60, 60, 67, 0.13);      /* quaternaryLabel-ish */
+  /* Surface (cards) */
+  --card: #FFFFFF;                          /* systemBackground */
+  --card-2: #F2F2F7;                        /* systemGroupedBackground */
+  /* System accents (iOS systemColors, light mode) */
+  --blue: #007AFF;                          /* systemBlue */
+  --cyan: #5AC8FA;                          /* systemCyan / lightBlue */
+  --green: #34C759;                         /* systemGreen */
+  --purple: #AF52DE;                        /* systemPurple */
+  --orange: #FF9500;                        /* systemOrange */
+  --on-accent: #FFFFFF;
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
   margin: 0;
-  font-family: 'Public Sans Variable', 'Public Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* iOS-native typography: SF Pro on Apple devices via -apple-system, then
+     per-OS system fonts everywhere else. Public Sans dropped — it overrode
+     the OS font and looked off-brand vs. the iOS palette. */
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   color: var(--text);
-  /* Cool light-grey "desk surface". Deliberately a touch deeper than the cards
-     so the solid-white panels read as elevated above it (the crypto-wallet
-     reference does the same — white cards floating on a soft grey canvas). */
-  background: linear-gradient(160deg, #eef1f6 0%, #e1e7f0 100%);
+  /* Near-white wallpaper with whisper-soft iOS systemBlue / systemPurple
+     spots in opposite corners. Reads as "white" to the eye, but the Liquid-
+     Glass cards above pick up enough colour through their backdrop-filter to
+     actually look like glass. Pure #fff = nothing to refract. */
+  background:
+    radial-gradient(60% 45% at 88% 6%, rgba(0, 122, 255, 0.14) 0%, transparent 60%),
+    radial-gradient(60% 45% at 8% 94%, rgba(175, 82, 222, 0.12) 0%, transparent 60%),
+    radial-gradient(55% 45% at 50% 50%, rgba(52, 199, 89, 0.06) 0%, transparent 65%),
+    #FBFBFD;
   overflow: hidden;
 }
-body:before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  /* faint light grain to add texture to the flat gradient */
-  background:
-    radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.5), transparent 2px) 0 0 / 20px 20px;
-  opacity: 0.35;
-  mix-blend-mode: soft-light;
-}
+/* body:before grain overlay removed — it was painted for the old colored
+   wallpaper. On pure white it contributes nothing useful and some Chromium
+   builds leave faint grey artefacts from the soft-light blend. */
 
 .shell {
   width: calc(100vw - 28px);
@@ -50,28 +54,69 @@ body:before {
   display: grid;
   grid-template-columns: 242px 1fr;
   overflow: hidden;
-  /* Light wash, kept mostly transparent so the grey canvas shows through and
-     the white cards inside have something to sit above. */
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(40, 55, 100, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 32px 80px rgba(40, 60, 110, 0.16);
-  backdrop-filter: blur(18px);
+  /* Pure-white page: keep the shell invisible (no shadow halo, no border).
+     The cards inside carry their own light shadow for separation. */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 /* Sidebar hidden (SHOW_SIDEBAR=false): collapse the shell to a single column
    so the main content spans the full width. */
 .shell.no-sidebar { grid-template-columns: 1fr; }
 
-/* Solid white elevated card. The old translucent "frosted glass" look had no
-   contrast against the near-white page (and its backdrop-blur had nothing to
-   blur), so cards vanished. A hairline grey edge + a two-layer soft shadow
-   (tight contact shadow + wide ambient) makes each panel read as lifted off
-   the grey canvas. */
+/* Liquid-Glass approximation (iOS 26 / macOS Tahoe style). Three things make
+   it read as glass rather than plain white:
+     1. Translucent base + heavy backdrop-blur with boosted saturation, so the
+        tinted wallpaper bleeds through and the card picks up its colour.
+     2. A directional specular sheen layered into the background (155° from
+        upper-left), faking a light source hitting the glass.
+     3. A bright rim-light inset shadow on the top edge — the glass catching
+        light along its top.
+   Refraction (true feDisplacementMap distortion) is intentionally skipped —
+   perf-heavy and visually fragile in the browser. */
+/* True Liquid Glass (iOS 26 / macOS Tahoe):
+     1. backdrop-filter: url(#liquid-glass) is the real refraction — the SVG
+        filter in index.html warps the backdrop pixels via feDisplacementMap,
+        producing the organic "lensing" that defines Liquid Glass. Chromium
+        only; Safari/Firefox fall through to the -webkit-backdrop-filter
+        line, which loses the refraction but keeps the blur.
+     2. Translucent gradient base + bright top rim-light + upper-left
+        specular sheen make the surface read as a lit, slightly convex glass
+        dome on top of the refracted backdrop.
+     3. backdrop-filter is layered: SVG refraction first → blur to smooth the
+        warp → saturate to keep colour from going washed-out. */
 .glass {
-  background: #ffffff;
-  border: 1px solid rgba(40, 55, 100, 0.07);
+  background:
+    /* upper-left specular sheen — brighter than before */
+    linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0.06) 32%,
+      rgba(255, 255, 255, 0) 52%
+    ),
+    /* translucent tint pushed lower (28→12% white) so the refracted
+       wallpaper shows through clearly — that's where the glass feel comes
+       from. */
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.06) 100%
+    );
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  /* Maximum blur — the wallpaper colour gets smeared into a soft gradient
+     under each card. 200% saturation keeps that smear vivid rather than
+     washing it into uniform grey. */
+  backdrop-filter: url(#liquid-glass) blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
   box-shadow:
-    0 1px 2px rgba(40, 60, 110, 0.05),
-    0 12px 28px rgba(40, 60, 110, 0.09);
+    /* bright top rim — glass catching light */
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.95),
+    /* faint inner bottom highlight — convex weight */
+    inset 0 -1px 0 rgba(255, 255, 255, 0.22),
+    /* subtle outer shadow */
+    0 2px 6px rgba(60, 60, 67, 0.06),
+    0 16px 34px rgba(60, 60, 67, 0.10);
 }
 
 .sidebar {
@@ -98,7 +143,7 @@ body:before {
 .nav-item {
   height: 48px; border-radius: 24px; padding: 0 16px;
   display: flex; align-items: center; gap: 13px;
-  color: rgba(28, 36, 64, 0.78); font-size: 14px; font-weight: 500;
+  color: rgba(60, 60, 67, 0.78); font-size: 14px; font-weight: 500;
   border: 1px solid transparent;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
@@ -108,18 +153,18 @@ body:before {
 .nav-item.active {
   background: rgba(255, 255, 255, 0.72);
   border-color: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 6px 16px rgba(40, 60, 110, 0.12);
+  box-shadow: 0 6px 16px rgba(60, 60, 67, 0.12);
   color: var(--blue);
 }
 
 .side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
-.plan { border-radius: 10px; padding: 17px 14px 15px; background: rgba(40, 55, 100, 0.05); border: 1px solid rgba(40, 55, 100, 0.12); }
+.plan { border-radius: 10px; padding: 17px 14px 15px; background: rgba(60, 60, 67, 0.05); border: 1px solid rgba(60, 60, 67, 0.12); }
 .plan .small { font-size: 12px; color: var(--muted); line-height: 1.8; }
 .plan .name { font-size: 13px; color: var(--text); margin-bottom: 4px; }
-.bar { height: 8px; background: rgba(40, 55, 100, 0.06); border-radius: 999px; overflow: hidden; margin: 10px 0 18px; }
+.bar { height: 8px; background: rgba(60, 60, 67, 0.06); border-radius: 999px; overflow: hidden; margin: 10px 0 18px; }
 .bar > span { display: block; height: 100%; width: 78%; border-radius: 999px; background: linear-gradient(90deg, #f0f6ff, #8d79ff); }
-.upgrade { height: 48px; border-radius: 10px; background: rgba(40, 55, 100, 0.05); border: 1px solid rgba(40, 55, 100, 0.12); display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--blue); font-size: 13px; }
-.user { height: 82px; border-radius: 12px; padding: 18px 14px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(40, 55, 100, 0.12); display: flex; align-items: center; gap: 13px; }
+.upgrade { height: 48px; border-radius: 10px; background: rgba(60, 60, 67, 0.05); border: 1px solid rgba(60, 60, 67, 0.12); display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--blue); font-size: 13px; }
+.user { height: 82px; border-radius: 12px; padding: 18px 14px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(60, 60, 67, 0.12); display: flex; align-items: center; gap: 13px; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #70a7ff, #4468ff); font-weight: 700; color: #fff; }
 .user .name { font-size: 14px; }
 .user .mail { font-size: 11px; color: var(--muted); }
@@ -142,13 +187,13 @@ main::-webkit-scrollbar-track {
   background: transparent;
 }
 main::-webkit-scrollbar-thumb {
-  background: rgba(40, 55, 100, 0.06);
+  background: rgba(60, 60, 67, 0.06);
   border-radius: 4px;
 }
 main::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.22);
 }
-main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thin; }
+main { scrollbar-color: rgba(60, 60, 67, 0.14) transparent; scrollbar-width: thin; }
 /* Topbar holds only the section tabs now (period picker + filter moved into
    the Lifetime row below). */
 .topbar {
@@ -164,8 +209,8 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   padding: 3px;
   display: flex;
   gap: 4px;
-  background: rgba(40, 55, 100, 0.06);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.06);
+  border: 1px solid rgba(60, 60, 67, 0.12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(18px);
 }
@@ -177,28 +222,28 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  color: rgba(28, 36, 64, 0.74);
+  color: rgba(60, 60, 67, 0.74);
   cursor: pointer;
   transition: color 0.15s ease, background 0.15s ease;
 }
 .tab:hover { color: var(--text); }
 .tab.active {
   color: #fff;
-  background: linear-gradient(180deg, #3f4860, #1c2440);
-  border: 1px solid rgba(40, 55, 100, 0.12);
-  box-shadow: 0 8px 18px rgba(28, 36, 64, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  background: #007AFF;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  box-shadow: 0 8px 18px rgba(0, 122, 255, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
-.round { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: rgba(40, 55, 100, 0.06); border: 1px solid rgba(40, 55, 100, 0.12); color: var(--text); cursor: pointer; }
+.round { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: rgba(60, 60, 67, 0.06); border: 1px solid rgba(60, 60, 67, 0.12); color: var(--text); cursor: pointer; }
 .round:hover { background: rgba(255, 255, 255, 0.2); }
 .filter-wrapper { position: relative; }
-.filter-trigger { border: 1px solid rgba(40, 55, 100, 0.12); transition: background 0.15s ease, border-color 0.15s ease; }
+.filter-trigger { border: 1px solid rgba(60, 60, 67, 0.12); transition: background 0.15s ease, border-color 0.15s ease; }
 .filter-trigger.active {
-  background: linear-gradient(180deg, #3f4860, #1c2440);
+  background: #007AFF;
   border-color: rgba(255, 255, 255, 0.4);
   color: #fff;
 }
 .filter-trigger.open {
-  border-color: rgba(28, 36, 64, 0.36);
+  border-color: rgba(60, 60, 67, 0.36);
 }
 .filter-dot {
   position: absolute;
@@ -219,9 +264,10 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 }
 .filter-popover-title {
   font-size: 11px;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(28, 36, 64, 0.7);
+  color: rgba(60, 60, 67, 0.62);
   margin-bottom: 2px;
 }
 
@@ -230,18 +276,18 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 .title p { margin: 0; color: var(--muted); font-size: 13px; }
 
 .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 15px; margin-bottom: 16px; }
-.kpi { height: 167px; border-radius: 11px; padding: 18px 18px 12px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.kpi { height: 167px; border-radius: 22px; padding: 18px 18px 12px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
 .kpi:after { content: ''; position: absolute; inset: auto -20px -40px -20px; height: 80px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0)); transform: skewY(-5deg); pointer-events: none; }
 .kpi-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
 .icon { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12); flex-shrink: 0; }
-/* Muted icon tones, each matched to its card's sparkline hue. (Class names kept
-   for stability; the values are now low-saturation, not literal blue/cyan/etc.) */
-.icon.blue { background: linear-gradient(135deg, #7da8a8, #517d7d); }   /* muted teal */
-.icon.cyan { background: linear-gradient(135deg, #9ba4bc, #6d7793); }   /* muted blue-grey */
-.icon.green { background: linear-gradient(135deg, #97ad8c, #688760); }  /* sage */
-.icon.purple { background: linear-gradient(135deg, #b4a0b2, #856d83); } /* dusty mauve */
-.icon.orange { background: linear-gradient(135deg, #cba588, #9d7350); } /* clay */
-.kpi-label { font-size: 13px; color: rgba(28, 36, 64, 0.84); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* KPI icon circles in iOS systemColor gradients (lighter top → saturated
+   base) — Apple HIG light mode. */
+.icon.blue { background: linear-gradient(135deg, #5AAEFF, #007AFF); }    /* systemBlue */
+.icon.cyan { background: linear-gradient(135deg, #8FDCFF, #5AC8FA); }    /* systemCyan */
+.icon.green { background: linear-gradient(135deg, #6CDC8A, #34C759); }   /* systemGreen */
+.icon.purple { background: linear-gradient(135deg, #CE85E8, #AF52DE); }  /* systemPurple */
+.icon.orange { background: linear-gradient(135deg, #FFC056, #FF9500); }  /* systemOrange */
+.kpi-label { font-size: 12px; color: rgba(60, 60, 67, 0.7); font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Value + delta share a row so each card can fit its sparkline below. The
    value font-size is set inline (adaptive to digit count); the row uses
@@ -280,15 +326,15 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 .spark .fill { opacity: 0.08; }
 
 .grid-main { display: grid; grid-template-columns: 1.45fr 0.61fr 0.66fr; gap: 15px; margin-bottom: 14px; }
-.panel { border-radius: 10px; position: relative; overflow: hidden; }
+.panel { border-radius: 22px; position: relative; overflow: hidden; }
 .panel-pad { padding: 16px; }
 .panel-title { font-size: 15px; font-weight: 650; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
 .panel-sub { color: var(--muted); font-size: 13px; font-weight: 400; }
-.chart-controls { position: absolute; right: 48px; top: 16px; display: flex; height: 28px; border-radius: 16px; background: rgba(40, 55, 100, 0.05); border: 1px solid rgba(40, 55, 100, 0.12); padding: 2px; }
-.chart-controls span { padding: 0 13px; display: grid; place-items: center; border-radius: 13px; font-size: 12px; color: rgba(28, 36, 64, 0.78); cursor: pointer; }
-.chart-controls .on { background: #2a3450; color: #fff; }
-.filter { position: absolute; right: 13px; top: 15px; width: 32px; height: 32px; border-radius: 14px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(40, 55, 100, 0.12); }
-.legend { display: flex; gap: 24px; font-size: 12px; color: rgba(28, 36, 64, 0.78); margin-bottom: 8px; }
+.chart-controls { position: absolute; right: 48px; top: 16px; display: flex; height: 28px; border-radius: 16px; background: rgba(60, 60, 67, 0.05); border: 1px solid rgba(60, 60, 67, 0.12); padding: 2px; }
+.chart-controls span { padding: 0 13px; display: grid; place-items: center; border-radius: 13px; font-size: 12px; color: rgba(60, 60, 67, 0.78); cursor: pointer; }
+.chart-controls .on { background: #007AFF; color: #fff; }
+.filter { position: absolute; right: 13px; top: 15px; width: 32px; height: 32px; border-radius: 14px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(60, 60, 67, 0.12); }
+.legend { display: flex; gap: 24px; font-size: 12px; color: rgba(60, 60, 67, 0.78); margin-bottom: 8px; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; }
 /* Trend area: 2-column grid (y-axis labels | chart). Fixed height so it
    never collides with siblings, even when MidGrid is stretched. */
@@ -307,8 +353,8 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   right: 8px;
   transform: translateY(-50%);
   font-size: 10px;
-  font-family: 'Public Sans Variable', 'Public Sans', sans-serif;
-  color: rgba(28, 36, 64, 0.5);
+  font-family: inherit;
+  color: rgba(60, 60, 67, 0.5);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -363,10 +409,10 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   text-align: center;
 }
 .donut-num { font-size: 24px; font-weight: 600; }
-.donut-text { font-size: 12px; color: var(--muted); margin-top: 6px; }
-.donut-list { font-size: 12px; line-height: 1.9; color: rgba(28, 36, 64, 0.84); flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.donut-text { font-size: 11px; color: var(--muted); margin-top: 6px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+.donut-list { font-size: 12px; line-height: 1.9; color: rgba(60, 60, 67, 0.84); flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .donut-list::-webkit-scrollbar { width: 6px; }
-.donut-list::-webkit-scrollbar-thumb { background: rgba(40, 55, 100, 0.12); border-radius: 3px; }
+.donut-list::-webkit-scrollbar-thumb { background: rgba(60, 60, 67, 0.12); border-radius: 3px; }
 .donut-list .r {
   display: grid;
   grid-template-columns: 1fr 66px 50px;
@@ -377,7 +423,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   transition: background 0.18s ease, color 0.18s ease, opacity 0.18s ease;
 }
 .donut-list .r.hovered {
-  background: rgba(40, 55, 100, 0.05);
+  background: rgba(60, 60, 67, 0.05);
   color: var(--text);
 }
 .donut-list .r.dimmed { opacity: 0.42; }
@@ -425,16 +471,19 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 .cache-card {
   border-radius: 10px;
   padding: 10px 14px;
-  background: rgba(40, 55, 100, 0.05);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.05);
+  border: 1px solid rgba(60, 60, 67, 0.12);
   display: flex;
   align-items: baseline;
   gap: 10px;
   min-width: 0;
 }
 .cache-card .l {
-  font-size: 12px;
-  color: rgba(28, 36, 64, 0.72);
+  font-size: 11px;
+  color: rgba(60, 60, 67, 0.62);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -468,8 +517,8 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   height: 26px;
   padding: 2px;
   border-radius: 13px;
-  background: rgba(40, 55, 100, 0.05);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.05);
+  border: 1px solid rgba(60, 60, 67, 0.12);
 }
 .breakdown-toggle button {
   height: 22px;
@@ -477,7 +526,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   border: 0;
   background: transparent;
   border-radius: 11px;
-  color: rgba(28, 36, 64, 0.7);
+  color: rgba(60, 60, 67, 0.7);
   font-family: inherit;
   font-size: 11.5px;
   font-weight: 600;
@@ -486,7 +535,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 }
 .breakdown-toggle button:hover { color: var(--text); }
 .breakdown-toggle button.on {
-  background: linear-gradient(180deg, #3f4860, #1c2440);
+  background: #007AFF;
   color: #fff;
 }
 .provider-list {
@@ -498,7 +547,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   overflow-y: auto;
 }
 .provider-list::-webkit-scrollbar { width: 6px; }
-.provider-list::-webkit-scrollbar-thumb { background: rgba(40, 55, 100, 0.12); border-radius: 3px; }
+.provider-list::-webkit-scrollbar-thumb { background: rgba(60, 60, 67, 0.12); border-radius: 3px; }
 .provider-row {
   display: grid;
   grid-template-columns: 1.3fr 1fr 2fr 0.7fr 0.9fr 0.9fr;
@@ -507,20 +556,21 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   padding: 8px 10px;
   border-radius: 8px;
   font-size: 12.5px;
-  color: rgba(28, 36, 64, 0.86);
+  color: rgba(60, 60, 67, 0.86);
   transition: background 0.18s ease;
 }
 .provider-row:not(.provider-head):hover {
-  background: rgba(40, 55, 100, 0.05);
+  background: rgba(60, 60, 67, 0.05);
 }
 .provider-head {
-  font-size: 11px;
-  color: rgba(28, 36, 64, 0.56);
-  font-weight: 500;
+  font-size: 10.5px;
+  color: rgba(60, 60, 67, 0.62);
+  font-weight: 600;
   padding-bottom: 8px;
   margin-bottom: 4px;
-  border-bottom: 1px solid rgba(40, 55, 100, 0.12);
-  letter-spacing: 0.02em;
+  border-bottom: 1px solid rgba(60, 60, 67, 0.12);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   /* Stay visible while the rows below scroll. White bg covers rows passing
      under it; the solid-white card means #fff matches the panel surface. */
   position: sticky;
@@ -561,7 +611,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   flex: 1;
   height: 8px;
   border-radius: 4px;
-  background: rgba(40, 55, 100, 0.05);
+  background: rgba(60, 60, 67, 0.05);
   overflow: hidden;
   min-width: 40px;
 }
@@ -573,7 +623,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 }
 .provider-pct {
   font-size: 11px;
-  color: rgba(28, 36, 64, 0.7);
+  color: rgba(60, 60, 67, 0.7);
   font-variant-numeric: tabular-nums;
   min-width: 44px;
   text-align: right;
@@ -598,7 +648,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
 /* ─── Coming soon placeholder (for not-yet-built tabs) ───────────────── */
 .coming-soon {
   margin-top: 14px;
-  border-radius: 14px;
+  border-radius: 22px;
   padding: 64px 32px;
   display: flex;
   flex-direction: column;
@@ -631,26 +681,27 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   width: 100%;
   border-collapse: collapse;
   font-size: 12.5px;
-  color: rgba(28, 36, 64, 0.88);
+  color: rgba(60, 60, 67, 0.88);
 }
 .logs-table thead th {
   text-align: left;
-  font-weight: 500;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: rgba(28, 36, 64, 0.55);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(60, 60, 67, 0.62);
   padding: 0 10px 10px;
-  border-bottom: 1px solid rgba(40, 55, 100, 0.12);
+  border-bottom: 1px solid rgba(60, 60, 67, 0.12);
   white-space: nowrap;
 }
 .logs-table thead th.num { text-align: right; }
 .logs-table tbody td {
   padding: 9px 10px;
-  border-bottom: 1px solid rgba(40, 55, 100, 0.12);
+  border-bottom: 1px solid rgba(60, 60, 67, 0.12);
   white-space: nowrap;
 }
 .logs-table tbody tr:last-child td { border-bottom: 0; }
-.logs-table tbody tr:hover td { background: rgba(40, 55, 100, 0.05); }
+.logs-table tbody tr:hover td { background: rgba(60, 60, 67, 0.05); }
 .logs-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .logs-table td.mono { font-variant-numeric: tabular-nums; }
 .logs-cell-truncate {
@@ -674,7 +725,7 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
-  color: rgba(28, 36, 64, 0.7);
+  color: rgba(60, 60, 67, 0.7);
 }
 .logs-pagination {
   display: flex;
@@ -685,26 +736,26 @@ main { scrollbar-color: rgba(28, 36, 64, 0.14) transparent; scrollbar-width: thi
   height: 30px;
   padding: 0 14px;
   border-radius: 8px;
-  background: rgba(40, 55, 100, 0.05);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.05);
+  border: 1px solid rgba(60, 60, 67, 0.12);
   color: var(--text);
   font-family: inherit;
   font-size: 12px;
   cursor: pointer;
   transition: background 0.12s ease, opacity 0.12s ease;
 }
-.logs-page-btn:hover:not(:disabled) { background: rgba(40, 55, 100, 0.06); }
+.logs-page-btn:hover:not(:disabled) { background: rgba(60, 60, 67, 0.06); }
 .logs-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .logs-page-num {
   min-width: 60px;
   text-align: center;
   font-variant-numeric: tabular-nums;
-  color: rgba(28, 36, 64, 0.85);
+  color: rgba(60, 60, 67, 0.85);
 }
 
 canvas { width: 100% !important; height: 100% !important; }
 .chart-canvas { height: 215px; }
-.soft-line { position: absolute; left: 0; right: 0; height: 1px; background: rgba(40, 55, 100, 0.05); }
+.soft-line { position: absolute; left: 0; right: 0; height: 1px; background: rgba(60, 60, 67, 0.05); }
 
 /* dev-only API health pill, top-left of shell. */
 .api-pill {
@@ -721,8 +772,8 @@ canvas { width: 100% !important; height: 100% !important; }
   font-size: 11px;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(40, 55, 100, 0.12);
-  color: rgba(28, 36, 64, 0.9);
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  color: rgba(60, 60, 67, 0.9);
   backdrop-filter: blur(12px);
 }
 .api-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, 0.4); }
@@ -756,7 +807,7 @@ canvas { width: 100% !important; height: 100% !important; }
   border: 1px solid rgba(255, 255, 255, 0.6);
   color: var(--text);
   backdrop-filter: blur(10px);
-  box-shadow: 0 6px 16px rgba(40, 60, 110, 0.15);
+  box-shadow: 0 6px 16px rgba(60, 60, 67, 0.15);
   cursor: pointer;
 }
 .sidebar-overlay {
@@ -784,7 +835,7 @@ canvas { width: 100% !important; height: 100% !important; }
     width: 240px;
     z-index: 200;
     padding: 24px 18px 18px;
-    border-right: 1px solid rgba(40, 55, 100, 0.1);
+    border-right: 1px solid rgba(60, 60, 67, 0.1);
     border-radius: 0 18px 18px 0;
     /* solid panel — no backdrop-filter so it never double-blurs with the scrim */
     background: #eef1f8;
@@ -868,7 +919,7 @@ canvas { width: 100% !important; height: 100% !important; }
   display: grid;
   place-items: center;
   font-size: 13px;
-  color: rgba(28, 36, 64, 0.72);
+  color: rgba(60, 60, 67, 0.72);
   letter-spacing: 0.04em;
 }
 
@@ -915,15 +966,15 @@ canvas { width: 100% !important; height: 100% !important; }
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
-  color: rgba(28, 36, 64, 0.78);
+  color: rgba(60, 60, 67, 0.78);
 }
 
 .login-field input {
   height: 40px;
   border-radius: 10px;
   padding: 0 12px;
-  background: rgba(40, 55, 100, 0.05);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.05);
+  border: 1px solid rgba(60, 60, 67, 0.12);
   color: var(--text);
   font-family: inherit;
   font-size: 13px;
@@ -932,8 +983,8 @@ canvas { width: 100% !important; height: 100% !important; }
 }
 
 .login-field input:focus {
-  border-color: rgba(31, 36, 64, 0.5);
-  background: rgba(40, 55, 100, 0.06);
+  border-color: rgba(0, 122, 255, 0.5);
+  background: rgba(60, 60, 67, 0.06);
 }
 
 .login-error {
@@ -948,14 +999,14 @@ canvas { width: 100% !important; height: 100% !important; }
 .login-submit {
   height: 42px;
   border-radius: 11px;
-  border: 1px solid rgba(40, 55, 100, 0.12);
-  background: linear-gradient(180deg, #3f4860, #1c2440);
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  background: #007AFF;
   color: #fff;
   font-weight: 650;
   font-size: 14px;
   letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 10px 22px rgba(28, 36, 64, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 22px rgba(0, 122, 255, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transition: transform 0.06s ease, opacity 0.12s ease;
 }
 
@@ -970,8 +1021,8 @@ canvas { width: 100% !important; height: 100% !important; }
 }
 
 .login-hint code {
-  background: rgba(40, 55, 100, 0.05);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.05);
+  border: 1px solid rgba(60, 60, 67, 0.12);
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 10.5px;
@@ -989,8 +1040,8 @@ canvas { width: 100% !important; height: 100% !important; }
   gap: 3px;
   padding: 3px;
   border-radius: 18px;
-  background: rgba(40, 55, 100, 0.06);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.06);
+  border: 1px solid rgba(60, 60, 67, 0.12);
 }
 .period-option {
   position: relative;
@@ -998,7 +1049,7 @@ canvas { width: 100% !important; height: 100% !important; }
   padding: 0 14px;
   border: 0;
   background: transparent;
-  color: rgba(28, 36, 64, 0.74);
+  color: rgba(60, 60, 67, 0.74);
   font-size: 12px;
   font-family: inherit;
   font-weight: 500;
@@ -1012,7 +1063,7 @@ canvas { width: 100% !important; height: 100% !important; }
   position: absolute;
   inset: 0;
   border-radius: 14px;
-  background: linear-gradient(180deg, #3f4860, #1c2440);
+  background: #007AFF;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
   z-index: 0;
 }
@@ -1025,7 +1076,7 @@ canvas { width: 100% !important; height: 100% !important; }
    slide here as well, plus its own popover beneath. */
 .period-custom-wrapper { position: relative; display: inline-flex; }
 .period-option.open {
-  background: rgba(40, 55, 100, 0.05);
+  background: rgba(60, 60, 67, 0.05);
 }
 .period-popover {
   position: absolute;
@@ -1034,10 +1085,17 @@ canvas { width: 100% !important; height: 100% !important; }
   z-index: 100;
   padding: 12px 14px 14px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(40, 55, 100, 0.12);
-  box-shadow: 0 18px 40px rgba(0, 16, 45, 0.36);
-  backdrop-filter: blur(14px);
+  /* Liquid Glass — translucent + heavy blur so the popover picks up the
+     wallpaper colour underneath. Sheen on the upper-left for the lit look. */
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.06) 38%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.66) 0%, rgba(255, 255, 255, 0.46) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 18px 40px rgba(60, 60, 67, 0.22);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1053,16 +1111,17 @@ canvas { width: 100% !important; height: 100% !important; }
   flex-direction: column;
   gap: 4px;
   font-size: 11px;
-  color: rgba(28, 36, 64, 0.72);
-  letter-spacing: 0.04em;
+  color: rgba(60, 60, 67, 0.62);
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 .period-popover-field input[type='date'] {
   height: 34px;
   padding: 0 10px;
   border-radius: 8px;
-  background: rgba(40, 55, 100, 0.05);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.05);
+  border: 1px solid rgba(60, 60, 67, 0.12);
   color: var(--text);
   font-family: inherit;
   font-size: 13px;
@@ -1072,14 +1131,14 @@ canvas { width: 100% !important; height: 100% !important; }
   text-transform: none;
 }
 .period-popover-field input[type='date']:focus {
-  border-color: rgba(31, 36, 64, 0.5);
-  background: rgba(40, 55, 100, 0.06);
+  border-color: rgba(0, 122, 255, 0.5);
+  background: rgba(60, 60, 67, 0.06);
 }
 .period-popover-apply {
   height: 34px;
   border-radius: 8px;
-  border: 1px solid rgba(40, 55, 100, 0.12);
-  background: linear-gradient(180deg, #3f4860, #1c2440);
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  background: #007AFF;
   color: #fff;
   font-weight: 600;
   font-size: 12.5px;
@@ -1095,7 +1154,7 @@ canvas { width: 100% !important; height: 100% !important; }
 /* ─── Lifetime totals row (period-driven; now also hosts the controls) ── */
 .lifetime-row {
   margin-bottom: 14px;
-  border-radius: 11px;
+  border-radius: 22px;
   padding: 14px 18px;
   display: flex;
   align-items: center;
@@ -1112,7 +1171,7 @@ canvas { width: 100% !important; height: 100% !important; }
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(28, 36, 64, 0.62);
+  color: rgba(60, 60, 67, 0.62);
   font-weight: 600;
 }
 .lifetime-sub { font-size: 11.5px; color: var(--muted2); }
@@ -1127,8 +1186,10 @@ canvas { width: 100% !important; height: 100% !important; }
 .lifetime-cell { display: flex; flex-direction: column; gap: 3px; min-width: 110px; }
 .lifetime-cell-label {
   font-size: 11px;
-  color: rgba(28, 36, 64, 0.62);
-  font-weight: 500;
+  color: rgba(60, 60, 67, 0.62);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 .lifetime-cell-value {
   font-size: 19px;
@@ -1158,9 +1219,9 @@ canvas { width: 100% !important; height: 100% !important; }
 .trend-panel { display: flex; flex-direction: column; }
 .trend-panel .chart-controls { cursor: default; }
 .trend-panel .chart-controls span { cursor: pointer; transition: background 0.12s ease; }
-.trend-panel .chart-controls span:hover { background: rgba(40, 55, 100, 0.05); }
-.trend-panel .filter { cursor: pointer; color: rgba(28, 36, 64, 0.85); }
-.trend-panel .filter:hover { background: rgba(40, 55, 100, 0.06); }
+.trend-panel .chart-controls span:hover { background: rgba(60, 60, 67, 0.05); }
+.trend-panel .filter { cursor: pointer; color: rgba(60, 60, 67, 0.85); }
+.trend-panel .filter:hover { background: rgba(60, 60, 67, 0.06); }
 
 .trend-toolbar {
   display: flex;
@@ -1193,8 +1254,8 @@ canvas { width: 100% !important; height: 100% !important; }
   height: 24px;
   padding: 2px;
   border-radius: 12px;
-  background: rgba(40, 55, 100, 0.05);
-  border: 1px solid rgba(40, 55, 100, 0.12);
+  background: rgba(60, 60, 67, 0.05);
+  border: 1px solid rgba(60, 60, 67, 0.12);
 }
 .trend-gran-opt {
   height: 20px;
@@ -1202,7 +1263,7 @@ canvas { width: 100% !important; height: 100% !important; }
   border: 0;
   background: transparent;
   border-radius: 10px;
-  color: rgba(28, 36, 64, 0.7);
+  color: rgba(60, 60, 67, 0.7);
   font-family: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -1211,7 +1272,7 @@ canvas { width: 100% !important; height: 100% !important; }
 }
 .trend-gran-opt:hover { color: var(--text); }
 .trend-gran-opt.on {
-  background: linear-gradient(180deg, #3f4860, #1c2440);
+  background: #007AFF;
   color: #fff;
 }
 
@@ -1219,9 +1280,9 @@ canvas { width: 100% !important; height: 100% !important; }
   height: 24px;
   padding: 0 12px;
   border-radius: 12px;
-  background: rgba(40, 55, 100, 0.05);
-  border: 1px solid rgba(40, 55, 100, 0.12);
-  color: rgba(28, 36, 64, 0.82);
+  background: rgba(60, 60, 67, 0.05);
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  color: rgba(60, 60, 67, 0.82);
   font-family: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -1229,11 +1290,11 @@ canvas { width: 100% !important; height: 100% !important; }
   transition: background 0.12s ease, color 0.12s ease;
   white-space: nowrap;
 }
-.trend-toggle:hover { background: rgba(40, 55, 100, 0.06); }
+.trend-toggle:hover { background: rgba(60, 60, 67, 0.06); }
 .trend-toggle.on {
-  background: linear-gradient(180deg, #3f4860, #1c2440);
+  background: #007AFF;
   color: #fff;
-  border-color: rgba(28, 36, 64, 0.28);
+  border-color: rgba(0, 122, 255, 0.45);
 }
 
 .trend-status {
@@ -1277,7 +1338,7 @@ canvas { width: 100% !important; height: 100% !important; }
   margin-left: -0.5px;
   /* Dark dashed guide so it reads against the white panel (was white, which
      was invisible after the light-theme background switch). */
-  border-left: 1px dashed rgba(40, 55, 100, 0.3);
+  border-left: 1px dashed rgba(60, 60, 67, 0.3);
   pointer-events: none;
   opacity: 0;
   transition:
@@ -1300,8 +1361,8 @@ canvas { width: 100% !important; height: 100% !important; }
   position: absolute;
   bottom: 4px;
   font-size: 10px;
-  color: rgba(28, 36, 64, 0.7);
-  font-family: 'Public Sans Variable', 'Public Sans', sans-serif;
+  color: rgba(60, 60, 67, 0.7);
+  font-family: inherit;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -1312,10 +1373,18 @@ canvas { width: 100% !important; height: 100% !important; }
   max-width: 240px;
   padding: 10px 12px 8px;
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(40, 55, 100, 0.12);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(10px);
+  /* Liquid Glass tooltip. Slightly more opaque than the period popover since
+     the tooltip floats over the chart panel (which is itself glass) and we
+     still need the numbers to read crisply at a glance. */
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.06) 35%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.52) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 14px 28px rgba(60, 60, 67, 0.22);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   pointer-events: none;
   z-index: 5;
   /* Smooth glide as the hovered column changes; mount fade-in via keyframe. */
@@ -1334,7 +1403,7 @@ canvas { width: 100% !important; height: 100% !important; }
   color: var(--text);
   margin-bottom: 7px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(40, 55, 100, 0.12);
+  border-bottom: 1px solid rgba(60, 60, 67, 0.12);
 }
 .trend-tip-row {
   display: flex;
@@ -1342,11 +1411,11 @@ canvas { width: 100% !important; height: 100% !important; }
   justify-content: space-between;
   gap: 10px;
   font-size: 11.5px;
-  color: rgba(28, 36, 64, 0.92);
+  color: rgba(60, 60, 67, 0.92);
   padding: 3px 0;
 }
 .trend-tip-row b {
-  font-family: 'Public Sans Variable', 'Public Sans', sans-serif;
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
   letter-spacing: -0.005em;
@@ -1370,7 +1439,7 @@ canvas { width: 100% !important; height: 100% !important; }
 .trend-tip-total {
   margin-top: 4px;
   padding-top: 6px;
-  border-top: 1px solid rgba(40, 55, 100, 0.12);
-  color: rgba(28, 36, 64, 0.7);
+  border-top: 1px solid rgba(60, 60, 67, 0.12);
+  color: rgba(60, 60, 67, 0.7);
   font-size: 11px;
 }

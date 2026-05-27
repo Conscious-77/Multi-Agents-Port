@@ -28,19 +28,17 @@ import {
   type PeriodKey,
 } from '@/lib/period'
 
-// Low-saturation "muted" palette (Morandi-ish): distinct enough to tell models
-// apart, but soft so the charts read calm rather than rainbow. The first 4–5
-// (donut top-N + by-model lines) are the most separated hues; the rest fill the
-// "list all" breakdown table.
+// iOS systemColors (light mode, Apple HIG). Saturated, well-balanced for
+// categorical charts. Order = visual prominence for the donut top-N.
 const MODEL_PALETTE = [
-  '#5f8a8a', // muted teal
-  '#b58a64', // muted clay / tan
-  '#7a9670', // sage green
-  '#9a8198', // dusty mauve
-  '#b0746f', // dusty rose
-  '#8089a0', // muted blue-grey
-  '#bca96d', // muted khaki gold
-  '#94908c', // warm grey
+  '#007AFF', // systemBlue
+  '#FF9500', // systemOrange
+  '#34C759', // systemGreen
+  '#AF52DE', // systemPurple
+  '#FF2D55', // systemPink
+  '#5AC8FA', // systemCyan
+  '#5856D6', // systemIndigo
+  '#FFCC00', // systemYellow
 ]
 
 // First-pass App: a 1:1 React port of the Vyra HTML design.
@@ -396,7 +394,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatNumber(curr?.total ?? 0)}
         delta={loading ? 'loading…' : error ? error : totalDelta.text}
         deltaPositive={totalDelta.positive}
-        sparkColor='#5f8a8a'
+        sparkColor='#007AFF'
         sparkPath={totalPath}
       />
       <KpiCard
@@ -406,7 +404,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatNumber(curr?.input ?? 0)}
         delta={loading ? 'loading…' : error ? '—' : inputDelta.text}
         deltaPositive={inputDelta.positive}
-        sparkColor='#8089a0'
+        sparkColor='#5AC8FA'
         sparkPath={inputPath}
       />
       <KpiCard
@@ -416,7 +414,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatNumber(curr?.output ?? 0)}
         delta={loading ? 'loading…' : error ? '—' : outputDelta.text}
         deltaPositive={outputDelta.positive}
-        sparkColor='#7a9670'
+        sparkColor='#34C759'
         sparkPath={outputPath}
       />
       <KpiCard
@@ -426,7 +424,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatNumber(curr?.cached ?? 0)}
         delta={loading ? 'loading…' : error ? '—' : cachedDelta.text}
         deltaPositive={cachedDelta.positive}
-        sparkColor='#9a8198'
+        sparkColor='#AF52DE'
         sparkPath={cachedPath}
       />
       <KpiCard
@@ -436,7 +434,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         value={loading ? '…' : error ? '—' : formatPercent(curr?.cacheHitRate ?? 0)}
         delta={loading ? 'loading…' : error ? '—' : hitRateDelta.text}
         deltaPositive={hitRateDelta.positive}
-        sparkColor='#9a8198'
+        sparkColor='#AF52DE'
         sparkPath={hitRatePath}
       />
       <KpiCard
@@ -447,7 +445,7 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
         delta={loading ? 'loading…' : error ? '—' : costDelta.text}
         // For cost, "up" is bad — flip the color semantic.
         deltaPositive={!costDelta.positive}
-        sparkColor='#b58a64'
+        sparkColor='#FF9500'
         sparkPath={costPath}
       />
     </section>
@@ -583,7 +581,7 @@ function buildDonut(
     display.push({
       name: `Others (${rest.length})`,
       value: restSum,
-      color: '#a8a39c',
+      color: '#AEAEB2',
     })
   }
 
@@ -608,7 +606,7 @@ function buildDonut(
   const othersDetail: DonutRow[] | null =
     othersModels.length > 0
       ? othersModels.map((m) => ({
-          color: '#a8a39c',
+          color: '#AEAEB2',
           name: m.model,
           value: formatNumber(m[field]),
           pct: `(${((m[field] / total) * 100).toFixed(1)}%)`,

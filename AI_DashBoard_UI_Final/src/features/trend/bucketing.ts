@@ -249,7 +249,7 @@ export function bucketLogsByModel(
   if (hasOthers) {
     othersEntry = {
       model: `Others (${ranked.length - topN})`,
-      color: '#a8a39c',
+      color: '#AEAEB2',
       buckets: Array.from({ length: spec.count }, emptyBucket),
       totalTokens: ranked.slice(topN).reduce((s, [, v]) => s + v, 0),
     }
@@ -305,7 +305,7 @@ export function bucketQuotaDataByModel(
   if (hasOthers) {
     othersEntry = {
       model: `Others (${ranked.length - topN})`,
-      color: '#a8a39c',
+      color: '#AEAEB2',
       buckets: Array.from({ length: spec.count }, emptyBucket),
       totalTokens: ranked.slice(topN).reduce((s, [, v]) => s + v, 0),
     }

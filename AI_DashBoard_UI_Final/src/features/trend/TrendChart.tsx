@@ -27,10 +27,10 @@ interface TrendChartProps {
 }
 
 const METRIC_COLOR: Record<TrendMetric, string> = {
-  total: '#5f8a8a',
-  input: '#7a9670',
-  output: '#9a8198',
-  cached: '#b58a64',
+  total: '#007AFF',   // systemBlue
+  input: '#34C759',   // systemGreen
+  output: '#AF52DE',  // systemPurple
+  cached: '#FF9500',  // systemOrange
 }
 
 const METRIC_LABEL: Record<TrendMetric, string> = {
@@ -490,7 +490,7 @@ function LineChartSvg(props: ChartSvgProps) {
               cx={xAt(i, props.spec.count)}
               cy={yAt(v, max)}
               r={isHover ? 4.2 : 2.4}
-              fill='#3c3b3e'
+              fill='#1C1C1E'
               stroke={s.color}
               strokeWidth={isHover ? 2 : 1.6}
               initial={{ opacity: 0 }}

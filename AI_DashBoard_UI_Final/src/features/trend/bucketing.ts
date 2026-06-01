@@ -1,5 +1,6 @@
 import { parseOther, type UsageLog } from '@/lib/logs'
 import type { QuotaDataItem } from '@/lib/quota-data'
+import type { UsageCostItem } from '@/lib/cost-data'
 import type { Period, PeriodKey } from '@/lib/period'
 
 const MINUTE = 60
@@ -129,7 +130,7 @@ export interface MetricBucket {
   input: number
   output: number
   cached: number
-  cost: number // sum of quota
+  cost: number
   requests: number // log count in this bucket
 }
 
@@ -155,7 +156,6 @@ function addLog(target: MetricBucket, log: UsageLog): void {
   target.input += input
   target.output += output
   target.total += input + output
-  target.cost += Number(log.quota) || 0
   target.requests += 1
   const other = parseOther(log.other)
   const cached =
@@ -165,8 +165,11 @@ function addLog(target: MetricBucket, log: UsageLog): void {
 
 function addQuota(target: MetricBucket, row: QuotaDataItem): void {
   target.total += Number(row.token_used) || 0
-  target.cost += Number(row.quota) || 0
   target.requests += Number(row.count) || 0
+}
+
+function addCost(target: MetricBucket, row: UsageCostItem): void {
+  target.cost += Number(row.cost_usd) || 0
 }
 
 // Aggregate-mode bucketing: one series for the whole dataset.
@@ -198,6 +201,19 @@ export function bucketQuotaData(
     addQuota(buckets[idx], row)
   }
   return { spec, buckets }
+}
+
+export function applyCostDataToBuckets(
+  buckets: MetricBucket[],
+  rows: UsageCostItem[],
+  period: Period,
+  spec: BucketSpec
+): void {
+  for (const row of rows) {
+    const idx = bucketIndex(row.created_at, period.start, spec.sizeSec, spec.count)
+    if (idx < 0) continue
+    addCost(buckets[idx], row)
+  }
 }
 
 export interface ModelSeries {

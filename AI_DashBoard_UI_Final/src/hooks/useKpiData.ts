@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readUser } from '@/lib/auth'
+import { fetchUsageCost, type UsageCostItem } from '@/lib/cost-data'
 import { fetchLogs, parseOther, type UsageLog } from '@/lib/logs'
 import { fetchQuotaData, type QuotaDataItem } from '@/lib/quota-data'
 import type { Period } from '@/lib/period'
@@ -12,7 +13,7 @@ export interface KpiPeriodTotals {
   output: number
   cached: number
   cacheHitRate: number // cached / input, range [0, 1]; 0 if input is 0
-  cost: number // sum of quota
+  cost: number // real USD cost from /api/usage/cost
   requests: number
   cachedRequests: number // logs whose response contained any cached tokens
 }
@@ -51,9 +52,11 @@ export interface KpiData {
   // surfaced here to avoid issuing a second /api/log request for the chart.
   currentItems: UsageLog[]
   // NewAPI's /api/data aggregate rows. These are the authoritative source for
-  // total tokens, request counts, cost, model distribution, and token trend so
-  // this dashboard matches web-synthex /dashboard/models.
+  // total tokens, request counts, model distribution, and token trend so this
+  // dashboard matches web-synthex /dashboard/models. Cost is supplied by
+  // /api/usage/cost.
   currentQuotaItems: QuotaDataItem[]
+  currentCostItems: UsageCostItem[]
   // window meta — useful for UI hints ("Sampled from N of M logs")
   windowStart: number
   windowEnd: number
@@ -98,20 +101,24 @@ function accumulateLogDetails(bucket: KpiPeriodTotals, log: UsageLog): void {
 
 function accumulateQuota(bucket: KpiPeriodTotals, row: QuotaDataItem): void {
   bucket.total += Number(row.token_used) || 0
-  bucket.cost += Number(row.quota) || 0
   bucket.requests += Number(row.count) || 0
+}
+
+function accumulateCost(bucket: KpiPeriodTotals, row: UsageCostItem): void {
+  bucket.cost += Number(row.cost_usd) || 0
 }
 
 function finalize(bucket: KpiPeriodTotals): void {
   bucket.cacheHitRate = bucket.input > 0 ? bucket.cached / bucket.input : 0
 }
 
-// Per-model rollup aligned with the models page (/dashboard/models): tokens,
-// calls and cost come from the quota_data aggregate (the authoritative source),
-// input/cached are enriched from the logs for the cache-hit column only.
+// Per-model rollup aligned with the models page (/dashboard/models): tokens
+// and calls come from the quota_data aggregate; cost comes from the dedicated
+// USD cost endpoint; input/cached are enriched from logs for cache-hit context.
 function rollupByModel(
   quotaRows: QuotaDataItem[],
-  logs: UsageLog[]
+  logs: UsageLog[],
+  costRows: UsageCostItem[]
 ): ModelStats[] {
   const map = new Map<string, ModelStats>()
   const ensure = (model: string): ModelStats => {
@@ -126,7 +133,10 @@ function rollupByModel(
     const e = ensure(row.model_name || 'unknown')
     e.calls += Number(row.count) || 0
     e.tokens += Number(row.token_used) || 0
-    e.cost += Number(row.quota) || 0
+  }
+  for (const row of costRows) {
+    const e = ensure(row.model_name || 'unknown')
+    e.cost += Number(row.cost_usd) || 0
   }
   // Enrich input/cached from logs; only touch models quota_data established so
   // the model set + totals stay reconciled with the models page.
@@ -187,16 +197,14 @@ function buildModelProviderMap(logs: UsageLog[]): Map<string, string> {
   return map
 }
 
-// Provider rollup aligned with the models page. Tokens / calls / cost are
-// summed from the quota_data aggregate (the authoritative source the model
-// donut + KPIs use), just regrouped by provider — so the provider totals
-// reconcile exactly with the model totals. Every quota_data row is counted;
-// models with no learnable provider fall into an "other" bucket rather than
-// being dropped. input / output / cached are enriched from the logs (for the
-// cache-hit column only) and never introduce a provider absent from quota_data.
+// Provider rollup aligned with the models page. Tokens / calls are summed from
+// quota_data; cost is summed from /api/usage/cost. Every quota_data row is
+// counted; models with no learnable provider fall into an "other" bucket.
+// input / output / cached are enriched from the logs for context.
 function rollupByProvider(
   quotaRows: QuotaDataItem[],
-  logs: UsageLog[]
+  logs: UsageLog[],
+  costRows: UsageCostItem[]
 ): ProviderStats[] {
   const modelProvider = buildModelProviderMap(logs)
   const providerOf = (model: string): string =>
@@ -217,7 +225,12 @@ function rollupByProvider(
     const entry = ensure(providerOf(row.model_name || 'unknown'))
     entry.calls += Number(row.count) || 0
     entry.tokens += Number(row.token_used) || 0
-    entry.cost += Number(row.quota) || 0
+  }
+  for (const row of costRows) {
+    const provider =
+      row.provider || providerOf(row.model_name || 'unknown')
+    const entry = ensure(provider)
+    entry.cost += Number(row.cost_usd) || 0
   }
 
   // Enrich input/output/cached from the logs. Only touch providers quota_data
@@ -266,9 +279,9 @@ async function fetchLogWindow(args: {
   return { items, total: total || items.length, truncated: items.length < total }
 }
 
-// Uses /api/data for authoritative aggregate totals (matching web-synthex
-// /dashboard/models) and /api/log only for fields that quota_data does not
-// expose: input/output/cache/provider breakdown.
+// Uses /api/data for token/request aggregate totals, /api/usage/cost for real
+// USD cost, and /api/log only for fields that quota_data does not expose:
+// input/output/cache/provider breakdown.
 export function useKpiData(period: Period): UseKpiDataResult {
   const [data, setData] = useState<KpiData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -299,6 +312,23 @@ export function useKpiData(period: Period): UseKpiDataResult {
           defaultTime: 'hour',
         })
       : Promise.resolve({ success: true, data: [] })
+    const currentCostReq = fetchUsageCost({
+      startTimestamp: period.start,
+      endTimestamp: period.end,
+      scope,
+      granularity: 60,
+    })
+    const prevCostReq = hasPrev
+      ? fetchUsageCost({
+          startTimestamp: period.prevStart,
+          endTimestamp: period.prevEnd,
+          scope,
+          granularity: 60,
+        })
+      : Promise.resolve({
+          success: true,
+          data: { items: [], pricing_version: '' },
+        })
     const currentLogsReq = fetchLogWindow({
       startTimestamp: period.start,
       endTimestamp: period.end,
@@ -312,17 +342,32 @@ export function useKpiData(period: Period): UseKpiDataResult {
         })
       : Promise.resolve({ items: [], total: 0, truncated: false })
 
-    Promise.all([currentQuotaReq, prevQuotaReq, currentLogsReq, prevLogsReq])
-      .then(([currQuota, prevQuota, currLogs, prevLogs]) => {
+    Promise.all([
+      currentQuotaReq,
+      prevQuotaReq,
+      currentCostReq,
+      prevCostReq,
+      currentLogsReq,
+      prevLogsReq,
+    ])
+      .then(([currQuota, prevQuota, currCost, prevCost, currLogs, prevLogs]) => {
         if (cancelled) return
         if (!currQuota.success || !currQuota.data) {
           setError(currQuota.message ?? 'failed to load quota data')
           setLoading(false)
           return
         }
+        if (!currCost.success || !currCost.data) {
+          setError(currCost.message ?? 'failed to load cost data')
+          setLoading(false)
+          return
+        }
         const currentQuotaItems = currQuota.data ?? []
         const previousQuotaItems =
           prevQuota.success && prevQuota.data ? prevQuota.data ?? [] : []
+        const currentCostItems = currCost.data.items ?? []
+        const previousCostItems =
+          prevCost.success && prevCost.data ? prevCost.data.items ?? [] : []
         const currentItems = currLogs.items
         const previousItems = prevLogs.items
 
@@ -330,6 +375,8 @@ export function useKpiData(period: Period): UseKpiDataResult {
         const previous = emptyTotals()
         for (const row of currentQuotaItems) accumulateQuota(current, row)
         for (const row of previousQuotaItems) accumulateQuota(previous, row)
+        for (const row of currentCostItems) accumulateCost(current, row)
+        for (const row of previousCostItems) accumulateCost(previous, row)
         for (const log of currentItems) accumulateLogDetails(current, log)
         for (const log of previousItems) accumulateLogDetails(previous, log)
         finalize(current)
@@ -338,10 +385,11 @@ export function useKpiData(period: Period): UseKpiDataResult {
         setData({
           current,
           previous,
-          byModel: rollupByModel(currentQuotaItems, currentItems),
-          byProvider: rollupByProvider(currentQuotaItems, currentItems),
+          byModel: rollupByModel(currentQuotaItems, currentItems, currentCostItems),
+          byProvider: rollupByProvider(currentQuotaItems, currentItems, currentCostItems),
           currentItems,
           currentQuotaItems,
+          currentCostItems,
           windowStart: period.start,
           windowEnd: period.end,
           pageTotal: currLogs.total,

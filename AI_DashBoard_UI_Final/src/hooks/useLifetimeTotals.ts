@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readUser } from '@/lib/auth'
+import { fetchUsageCost } from '@/lib/cost-data'
 import { fetchQuotaData } from '@/lib/quota-data'
 
 const ROLE_ADMIN = 10
@@ -43,26 +44,41 @@ export function useLifetimeTotals(): UseLifetimeTotalsResult {
     const startSec =
       scope === 'admin' ? SINCE_EPOCH : endSec - SELF_FALLBACK_DAYS * DAY
 
-    fetchQuotaData({
+    const quotaReq = fetchQuotaData({
       startTimestamp: startSec,
       endTimestamp: endSec,
       defaultTime: 'hour',
       scope,
     })
-      .then((res) => {
+    const costReq = fetchUsageCost({
+      startTimestamp: startSec,
+      endTimestamp: endSec,
+      granularity: 86400,
+      scope,
+    })
+
+    Promise.all([quotaReq, costReq])
+      .then(([quotaRes, costRes]) => {
         if (cancelled) return
-        if (!res.success || !res.data) {
-          setError(res.message ?? 'failed to load quota data')
+        if (!quotaRes.success || !quotaRes.data) {
+          setError(quotaRes.message ?? 'failed to load quota data')
+          setLoading(false)
+          return
+        }
+        if (!costRes.success || !costRes.data) {
+          setError(costRes.message ?? 'failed to load cost data')
           setLoading(false)
           return
         }
         let tokens = 0
         let cost = 0
         let requests = 0
-        for (const row of res.data) {
+        for (const row of quotaRes.data) {
           tokens += Number(row.token_used) || 0
-          cost += Number(row.quota) || 0
           requests += Number(row.count) || 0
+        }
+        for (const row of costRes.data.items ?? []) {
+          cost += Number(row.cost_usd) || 0
         }
         setData({ tokens, cost, requests, scope })
         setLoading(false)

@@ -7,7 +7,12 @@ import { PeriodPicker } from '@/components/PeriodPicker'
 import { LogsPage } from '@/features/logs/LogsPage'
 import { useLifetimeTotals } from '@/hooks/useLifetimeTotals'
 import { TrendChart } from '@/features/trend/TrendChart'
-import { bucketLogs, bucketQuotaData, buildSparkPath } from '@/features/trend/bucketing'
+import {
+  applyCostDataToBuckets,
+  bucketLogs,
+  bucketQuotaData,
+  buildSparkPath,
+} from '@/features/trend/bucketing'
 import {
   useKpiData,
   type ModelStats,
@@ -327,9 +332,18 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
   // a real sparkline. When data is loading we leave the path empty and fall
   // back to the static design path so the card layout stays the same.
   const buckets = useMemo(
-    () =>
-      data?.currentItems ? bucketLogs(data.currentItems, props.period) : null,
-    [data?.currentItems, props.period]
+    () => {
+      if (!data?.currentItems) return null
+      const bucketed = bucketLogs(data.currentItems, props.period)
+      applyCostDataToBuckets(
+        bucketed.buckets,
+        data.currentCostItems,
+        props.period,
+        bucketed.spec
+      )
+      return bucketed
+    },
+    [data?.currentItems, data?.currentCostItems, props.period]
   )
   const quotaBuckets = useMemo(
     () =>
@@ -367,9 +381,8 @@ function KpisRow(props: { kpi: KpiQuery; period: Period }) {
     [buckets]
   )
   const costPath = useMemo(
-    () =>
-      quotaBuckets ? buildSparkPath(quotaBuckets.buckets.map((b) => b.cost)) : '',
-    [quotaBuckets]
+    () => (buckets ? buildSparkPath(buckets.buckets.map((b) => b.cost)) : ''),
+    [buckets]
   )
 
   const totalDelta = formatPercentDelta(curr?.total ?? 0, prev?.total ?? 0)
